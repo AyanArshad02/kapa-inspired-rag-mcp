@@ -63,6 +63,8 @@ generates a grounded answer with inline citations pointing to source
 URLs.
 
 Success criteria:
+- Context window includes top-5 retrieved chunks + last 3 conversation
+  turns (injected from session history before LLM call)
 - Every factual claim in the answer is tied to a source chunk
 - If retrieved chunks do not contain the answer, system responds with
   "I don't know based on available documentation" — never hallucinates
@@ -92,6 +94,8 @@ Endpoints:
   POST /query               → submit a question, get grounded answer
   GET  /health              → system health check
   GET  /metrics             → retrieval + quality metrics per tenant
+  POST /sessions            → create a new session, returns session_id
+  DELETE /sessions/{id}     → expire a session manually
 
 - All endpoints require API key authentication
 - Rate limiting enforced per tenant (configurable)
@@ -146,7 +150,6 @@ Success criteria:
 
 - Confluence, Notion, Jira connectors
 - Real-time Slack sync (webhook-based, not export-based)
-- Chat history + multi-turn conversation support
 - Web UI / chat widget for non-API users
 - Semantic caching (embedding-based, not just exact match)
 - Per-tenant custom reranking weights
