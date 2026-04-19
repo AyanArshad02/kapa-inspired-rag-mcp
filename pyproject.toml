@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.backends.legacy:build"
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "kapa-inspired-rag-mcp"
@@ -52,6 +52,9 @@ dev = [
     "ruff>=0.4.0",
     "mypy>=1.10.0",
 ]
+
+[tool.setuptools.packages.find]
+include = ["backend*", "eval*"]
 
 [tool.ruff]
 line-length = 100

@@ -22,7 +22,7 @@ class ConnectorStrategy(ABC):
         ...
 
     @abstractmethod
-    async def fetch_chunks(
+    def fetch_chunks(
         self, source_url: str, tenant_id: str
     ) -> AsyncIterator[Chunk]:
         """Yield chunks as they are produced (memory-safe for large sources)."""
