@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from uuid import UUID
 
@@ -33,7 +34,7 @@ class PostgresIngestionJobRepository(IngestionJobRepository):
                 job.source_url,
                 job.source_type.value,
                 job.status.value,
-                "{}",
+                json.dumps(job.checkpoint),
             )
         return job
 
@@ -82,16 +83,24 @@ class PostgresIngestionJobRepository(IngestionJobRepository):
             )
 
 
+def _decode_jsonb(value) -> dict:
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        return value
+    return json.loads(value)
+
+
 def _row_to_job(row: asyncpg.Record) -> IngestionJob:
     return IngestionJob(
-        id=UUID(row["job_id"]),
-        tenant_id=row["tenant_id"],
+        id=UUID(str(row["job_id"])),
+        tenant_id=str(row["tenant_id"]),
         source_url=row["source_url"],
         source_type=SourceType(row["source_type"]),
         status=IngestionStatus(row["status"]),
         total_chunks=row.get("docs_processed", 0),
         error_message=row.get("error_message"),
-        checkpoint=dict(row.get("checkpoint") or {}),
+        checkpoint=_decode_jsonb(row.get("checkpoint")),
         created_at=row["created_at"],
         updated_at=row["updated_at"],
     )

@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from uuid import UUID
 
-from backend.models import IngestionJob, Turn
+from backend.models import IngestionJob, IngestionStatus, Turn
 
 
 class IngestionJobRepository(ABC):
@@ -25,7 +25,7 @@ class IngestionJobRepository(ABC):
     async def update_status(
         self,
         job_id: UUID,
-        status: str,
+        status: IngestionStatus,
         error_message: str | None = None,
         checkpoint: dict | None = None,
     ) -> None:
