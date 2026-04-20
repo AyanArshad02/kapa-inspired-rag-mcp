@@ -86,7 +86,9 @@ class QdrantDB(VectorDBStrategy):
         )
 
     async def collection_exists(self, tenant_id: str) -> bool:
-        return await self._client.collection_exists(_collection(tenant_id))
+        # Avoid /collections/{name}/exists which was added post-1.7.4
+        result = await self._client.get_collections()
+        return _collection(tenant_id) in {c.name for c in result.collections}
 
     async def create_collection(self, tenant_id: str) -> None:
         await self._client.create_collection(
