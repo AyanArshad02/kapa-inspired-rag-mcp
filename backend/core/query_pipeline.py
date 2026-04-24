@@ -19,6 +19,7 @@ import logging
 from collections.abc import AsyncIterator
 from uuid import UUID
 
+from backend.core.context_window_builder import ContextWindowBuilder
 from backend.models import ContextWindow, QueryResult, Turn
 from backend.observers.base import QueryObserver
 from backend.repositories.base import ConversationRepository
@@ -62,6 +63,7 @@ class QueryPipeline:
         self._cache = cache
         self._conversation_repo = conversation_repo
         self._observers = observers
+        self._context_builder = ContextWindowBuilder()
 
     async def handle(
         self,
@@ -144,10 +146,10 @@ class QueryPipeline:
 
         reranked = await self._reranker.rerank(query, chunks, top_n=_TOP_N_RERANK)
 
-        return ContextWindow(
+        return self._context_builder.build(
             query=query,
             chunks=reranked,
-            conversation_history=recent_turns,
+            history=recent_turns,
             tenant_id=tenant_id,
         )
 
@@ -176,6 +178,7 @@ class QueryPipeline:
     ) -> None:
         turn = Turn(
             conversation_id=conversation_id,
+            tenant_id=tenant_id,
             user_message=query,
             assistant_message=answer,
         )

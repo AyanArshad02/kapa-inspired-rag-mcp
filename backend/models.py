@@ -48,6 +48,7 @@ class Turn:
 
     id: UUID = field(default_factory=uuid4)
     conversation_id: UUID = field(default_factory=uuid4)
+    tenant_id: str = ""
     user_message: str = ""
     assistant_message: str = ""
     source_chunk_ids: list[UUID] = field(default_factory=list)

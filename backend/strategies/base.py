@@ -112,7 +112,7 @@ class LLMStrategy(ABC):
         ...
 
     @abstractmethod
-    async def generate_stream(
+    def generate_stream(
         self, context: ContextWindow
     ) -> AsyncIterator[str]:
         """Yield answer tokens as they arrive (SSE-friendly)."""
