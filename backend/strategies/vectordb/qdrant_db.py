@@ -34,7 +34,7 @@ class QdrantDB(VectorDBStrategy):
     """
 
     def __init__(self) -> None:
-        self._client = AsyncQdrantClient(url=settings.qdrant_url)
+        self._client = AsyncQdrantClient(url=settings.qdrant_url, check_compatibility=False)
         self._dimension = settings.openai_embedding_dimensions
         self._circuit = CircuitBreaker("qdrant", failure_threshold=3, recovery_timeout=10.0)
 
