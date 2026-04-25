@@ -4,63 +4,67 @@ import asyncio
 import logging
 from uuid import UUID
 
-from celery import Task
+import asyncpg
 
 from backend.strategies.queue.celery_redis_queue import celery_app
 
 logger = logging.getLogger(__name__)
 
 
-class IngestionTask(Task):
-    """
-    Base task class that holds lazily initialised pipeline instance.
-
-    Celery workers are long-lived processes. We build the pipeline once
-    on first use (not at import time) so the worker starts fast and only
-    pays the initialisation cost when the first job arrives.
-    """
-
-    _pipeline = None
-
-    @property
-    def pipeline(self):
-        if self._pipeline is None:
-            from backend.tasks._pipeline_factory import build_ingestion_pipeline
-            self._pipeline = build_ingestion_pipeline()
-        return self._pipeline
-
-
 @celery_app.task(
     bind=True,
-    base=IngestionTask,
     name="backend.tasks.ingest.run_ingestion_job",
     max_retries=3,
     default_retry_delay=60,
     acks_late=True,
 )
 def run_ingestion_job(self, job_id: str) -> dict:
-    """Entry point for Celery. Runs the async pipeline synchronously."""
+    """Entry point for Celery. Runs the async pipeline in a fresh event loop."""
     logger.info("worker picked up job=%s", job_id)
     try:
-        asyncio.run(_run(self.pipeline, job_id))
+        asyncio.run(_run(job_id))
         return {"status": "completed", "job_id": job_id}
     except Exception as exc:
         logger.error("job=%s failed: %s", job_id, exc)
         raise self.retry(exc=exc)
 
 
-async def _run(pipeline, job_id: str) -> None:
+async def _run(job_id: str) -> None:
+    """
+    Build the full pipeline inside the event loop that will use it.
+    asyncpg pools are bound to the event loop they are created in —
+    creating the pool here (not in the parent process) avoids the
+    'another operation is in progress' fork-safety error.
+    """
+    from backend.config import settings
+    from backend.connectors.docs_connector import DocsConnector
+    from backend.connectors.factory import ConnectorFactory
+    from backend.core.ingestion_pipeline import IngestionPipeline
     from backend.repositories.postgres_ingestion_job_repo import PostgresIngestionJobRepository
-    from backend.tasks._pipeline_factory import get_db_pool
+    from backend.strategies.embedding.openai_embedding import OpenAIEmbedding
+    from backend.strategies.embedding.tf_sparse_encoder import TFSparseEncoder
+    from backend.strategies.vectordb.qdrant_db import QdrantDB
 
-    pool = await get_db_pool()
-    repo = PostgresIngestionJobRepository(pool)
-    job = await repo.get(UUID(job_id))
+    pool = await asyncpg.create_pool(settings.postgres_url.replace("+asyncpg", ""))
+    try:
+        repo = PostgresIngestionJobRepository(pool)
+        job = await repo.get(UUID(job_id))
+        if job is None:
+            raise ValueError(f"Job {job_id} not found in database")
 
-    if job is None:
-        raise ValueError(f"Job {job_id} not found in database")
-
-    await pipeline.run(job)
+        factory = ConnectorFactory()
+        factory.register(DocsConnector())
+        pipeline = IngestionPipeline(
+            connector_factory=factory,
+            embedder=OpenAIEmbedding(),
+            sparse_encoder=TFSparseEncoder(),
+            vector_db=QdrantDB(),
+            job_repo=repo,
+        )
+        await pipeline.run(job)
+        logger.info("job=%s completed", job_id)
+    finally:
+        await pool.close()
 
 
 

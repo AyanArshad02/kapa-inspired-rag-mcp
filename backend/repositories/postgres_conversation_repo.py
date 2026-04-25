@@ -30,7 +30,7 @@ class PostgresConversationRepository(ConversationRepository):
             await conn.executemany(
                 """
                 INSERT INTO conversation_turns
-                    (turn_id, session_id, tenant_id, role, content, tokens)
+                    (turn_id, conversation_id, tenant_id, role, content, tokens)
                 VALUES ($1, $2, $3, $4, $5, $6)
                 """,
                 [
@@ -63,7 +63,7 @@ class PostgresConversationRepository(ConversationRepository):
                 """
                 SELECT role, content, created_at
                 FROM conversation_turns
-                WHERE session_id = $1
+                WHERE conversation_id = $1
                 ORDER BY created_at DESC
                 LIMIT $2
                 """,
@@ -77,7 +77,7 @@ class PostgresConversationRepository(ConversationRepository):
     async def delete_conversation(self, conversation_id: UUID) -> None:
         async with self._pool.acquire() as conn:
             await conn.execute(
-                "DELETE FROM conversation_turns WHERE session_id = $1",
+                "DELETE FROM conversation_turns WHERE conversation_id = $1",
                 str(conversation_id),
             )
 

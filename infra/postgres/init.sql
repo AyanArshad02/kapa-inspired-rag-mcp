@@ -23,13 +23,13 @@ CREATE TABLE IF NOT EXISTS ingestion_jobs (
 );
 
 CREATE TABLE IF NOT EXISTS conversation_turns (
-    turn_id     UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    session_id  UUID NOT NULL,
-    tenant_id   UUID NOT NULL REFERENCES tenants(tenant_id),
-    role        VARCHAR(20) NOT NULL,
-    content     TEXT NOT NULL,
-    tokens      INTEGER NOT NULL,
-    created_at  TIMESTAMP DEFAULT NOW()
+    turn_id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    conversation_id UUID NOT NULL,
+    tenant_id       UUID NOT NULL REFERENCES tenants(tenant_id),
+    role            VARCHAR(20) NOT NULL,
+    content         TEXT NOT NULL,
+    tokens          INTEGER NOT NULL,
+    created_at      TIMESTAMP DEFAULT NOW()
 );
 
 ALTER TABLE ingestion_jobs ENABLE ROW LEVEL SECURITY;
@@ -43,5 +43,5 @@ CREATE POLICY tenant_isolation_turns ON conversation_turns
 
 CREATE INDEX IF NOT EXISTS idx_jobs_tenant_id  ON ingestion_jobs(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_status     ON ingestion_jobs(status);
-CREATE INDEX IF NOT EXISTS idx_turns_session   ON conversation_turns(session_id);
+CREATE INDEX IF NOT EXISTS idx_turns_conversation ON conversation_turns(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_turns_created   ON conversation_turns(created_at DESC);
