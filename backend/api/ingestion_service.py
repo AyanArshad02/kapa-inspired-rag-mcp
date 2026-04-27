@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import tempfile
+from pathlib import Path
 from uuid import UUID
 
 import asyncpg
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel, HttpUrl
 
 from backend.api.middleware.auth import get_tenant_id
@@ -62,6 +64,38 @@ async def submit_ingestion_job(
         tenant_id=tenant_id,
         source_url=str(body.source_url),
         source_type=body.source_type,
+    )
+    repo: PostgresIngestionJobRepository = app.state.job_repo
+    await repo.create(job)
+    await _queue.enqueue(job)
+    return IngestResponse(job_id=job.id, status=job.status)
+
+
+@app.post("/ingest/upload", response_model=IngestResponse, status_code=202)
+async def upload_and_ingest(
+    file: UploadFile = File(...),
+    tenant_id: str = Depends(get_tenant_id),
+) -> IngestResponse:
+    """Accept a .pdf or .md file upload and queue it for ingestion."""
+    filename = file.filename or ""
+    suffix = Path(filename).suffix.lower()
+    if suffix not in {".pdf", ".md"}:
+        raise HTTPException(status_code=422, detail="Only .pdf and .md files are supported")
+
+    content = await file.read()
+
+    # NamedTemporaryFile with delete=False so the Celery worker (separate process) can open it.
+    with tempfile.NamedTemporaryFile(
+        suffix=suffix, delete=False, dir="/tmp"
+    ) as tmp:
+        tmp.write(content)
+        tmp_path = tmp.name
+
+    source_type = SourceType.PDF if suffix == ".pdf" else SourceType.DOCS_SITE
+    job = IngestionJob(
+        tenant_id=tenant_id,
+        source_url=tmp_path,
+        source_type=source_type,
     )
     repo: PostgresIngestionJobRepository = app.state.job_repo
     await repo.create(job)

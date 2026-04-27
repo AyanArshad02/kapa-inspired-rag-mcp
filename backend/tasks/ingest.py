@@ -52,8 +52,11 @@ async def _run(job_id: str) -> None:
         if job is None:
             raise ValueError(f"Job {job_id} not found in database")
 
+        from backend.connectors.pdf_connector import PDFConnector
+
         factory = ConnectorFactory()
         factory.register(DocsConnector())
+        factory.register(PDFConnector())
         pipeline = IngestionPipeline(
             connector_factory=factory,
             embedder=OpenAIEmbedding(),
