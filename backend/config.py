@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     openai_api_key: str
     cohere_api_key: str = ""
     langsmith_api_key: str = ""
+    github_token: str = ""
 
     qdrant_url: str = "http://localhost:6333"
     redis_url: str = "redis://localhost:6379"
