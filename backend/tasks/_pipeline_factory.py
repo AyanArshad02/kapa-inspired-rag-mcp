@@ -7,6 +7,8 @@ import asyncpg
 from backend.config import settings
 from backend.connectors.docs_connector import DocsConnector
 from backend.connectors.factory import ConnectorFactory
+from backend.connectors.github_connector import GitHubConnector
+from backend.connectors.pdf_connector import PDFConnector
 from backend.core.ingestion_pipeline import IngestionPipeline
 from backend.strategies.embedding.openai_embedding import OpenAIEmbedding
 from backend.strategies.embedding.tf_sparse_encoder import TFSparseEncoder
@@ -25,6 +27,8 @@ async def get_db_pool() -> asyncpg.Pool:
 def build_ingestion_pipeline() -> IngestionPipeline:
     factory = ConnectorFactory()
     factory.register(DocsConnector())
+    factory.register(PDFConnector())
+    factory.register(GitHubConnector())
 
     from backend.repositories.postgres_ingestion_job_repo import PostgresIngestionJobRepository
 
