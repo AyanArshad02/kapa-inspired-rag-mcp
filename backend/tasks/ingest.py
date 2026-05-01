@@ -52,11 +52,13 @@ async def _run(job_id: str) -> None:
         if job is None:
             raise ValueError(f"Job {job_id} not found in database")
 
+        from backend.connectors.github_connector import GitHubConnector
         from backend.connectors.pdf_connector import PDFConnector
 
         factory = ConnectorFactory()
         factory.register(DocsConnector())
         factory.register(PDFConnector())
+        factory.register(GitHubConnector())
         pipeline = IngestionPipeline(
             connector_factory=factory,
             embedder=OpenAIEmbedding(),

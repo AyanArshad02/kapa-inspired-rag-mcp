@@ -62,8 +62,16 @@ class GitHubConnector(ConnectorStrategy):
         return SourceType.GITHUB
 
     async def fetch_chunks(
-        self, source_url: str, tenant_id: str
+        self,
+        source_url: str,
+        tenant_id: str,
+        file_filter: set[str] | None = None,
     ) -> AsyncIterator[Chunk]:
+        """Yield chunks for all indexable files in the repo.
+
+        When ``file_filter`` is provided (e.g. from a webhook payload),
+        only the listed file paths are fetched — skipping the full tree walk.
+        """
         owner, repo = _parse_repo_url(source_url)
         logger.info("github connector: %s/%s", owner, repo)
 
@@ -73,7 +81,10 @@ class GitHubConnector(ConnectorStrategy):
             timeout=30,
             follow_redirects=True,
         ) as client:
-            paths = await _list_indexable_files(client, owner, repo)
+            if file_filter is not None:
+                paths = [p for p in file_filter if not _should_skip(p)]
+            else:
+                paths = await _list_indexable_files(client, owner, repo)
             logger.info("github connector: %d indexable files", len(paths))
 
             for path in paths:

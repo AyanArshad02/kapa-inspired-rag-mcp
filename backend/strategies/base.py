@@ -74,6 +74,15 @@ class VectorDBStrategy(ABC):
         ...
 
     @abstractmethod
+    async def delete_by_filter(self, tenant_id: str, filter_dict: dict[str, str]) -> None:
+        """Delete all chunks whose payload matches every key=value in filter_dict.
+
+        Supports dot-notation for nested keys (e.g. ``metadata.file_path``).
+        Used by FreshnessManager to purge a whole source or a single file.
+        """
+        ...
+
+    @abstractmethod
     async def collection_exists(self, tenant_id: str) -> bool:
         ...
 

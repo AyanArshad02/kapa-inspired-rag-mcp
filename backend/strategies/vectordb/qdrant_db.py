@@ -85,6 +85,19 @@ class QdrantDB(VectorDBStrategy):
             points_selector=PointIdsList(points=chunk_ids),
         )
 
+    async def delete_by_filter(self, tenant_id: str, filter_dict: dict[str, str]) -> None:
+        from qdrant_client.models import FilterSelector
+
+        conditions = [
+            FieldCondition(key=k, match=MatchValue(value=v))
+            for k, v in filter_dict.items()
+        ]
+        await self._circuit.call(
+            self._client.delete,
+            collection_name=_collection(tenant_id),
+            points_selector=FilterSelector(filter=Filter(must=conditions)),
+        )
+
     async def collection_exists(self, tenant_id: str) -> bool:
         # Avoid /collections/{name}/exists which was added post-1.7.4
         result = await self._client.get_collections()
