@@ -7,6 +7,12 @@ class Settings(BaseSettings):
     langsmith_api_key: str = ""
     github_token: str = ""
 
+    # S3 — used for tenant-uploaded PDF / Markdown files
+    s3_bucket: str = "kapa-rag-uploads"
+    s3_region: str = "us-east-1"
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
+
     qdrant_url: str = "http://localhost:6333"
     redis_url: str = "redis://localhost:6379"
     postgres_url: str = "postgresql+asyncpg://kapa:kapa_dev_password@localhost:5432/kapa_rag"
