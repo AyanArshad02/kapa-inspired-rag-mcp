@@ -60,6 +60,8 @@ kapa-rag-mcp-skill
 # personal notes
 notes.txt
 content.md
+LEARNINGS.md
+INTERVIEW.md
 
 # Translations
 *.mo

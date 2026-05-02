@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 
 from ragas import EvaluationDataset, SingleTurnSample, evaluate
-from ragas.metrics.collections import context_recall, faithfulness
+from ragas.metrics import ContextRecall, Faithfulness
 
 ROOT = Path(__file__).resolve().parent.parent
 GOLDEN_DIRS = [
@@ -81,7 +81,7 @@ def main() -> None:
     dataset = build_dataset(sample)
     result = evaluate(
         dataset=dataset,
-        metrics=[context_recall, faithfulness],
+        metrics=[ContextRecall(), Faithfulness()],
         show_progress=True,
     )
 
