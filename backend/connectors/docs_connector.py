@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 
 from backend.connectors.base import ConnectorStrategy
 from backend.connectors.chunkers.heading_aware_chunker import HeadingAwareChunker
+from backend.exceptions import SourceUnreachableError
 from backend.models import Chunk, SourceType
 from backend.strategies.base import ChunkerStrategy
 
@@ -46,10 +47,17 @@ class DocsConnector(ConnectorStrategy):
 
 
 async def _fetch_html(url: str) -> str:
-    async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
-        response = await client.get(url, headers={"User-Agent": "kapa-rag-bot/1.0"})
-        response.raise_for_status()
-        return response.text
+    try:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+            response = await client.get(url, headers={"User-Agent": "kapa-rag-bot/1.0"})
+            response.raise_for_status()
+            return response.text
+    except httpx.TimeoutException as exc:
+        raise SourceUnreachableError(f"Timeout fetching {url}") from exc
+    except httpx.HTTPStatusError as exc:
+        raise SourceUnreachableError(f"HTTP {exc.response.status_code} for {url}") from exc
+    except httpx.HTTPError as exc:
+        raise SourceUnreachableError(f"Network error fetching {url}: {exc}") from exc
 
 
 def _html_to_markdown(html: str) -> str:

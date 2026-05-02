@@ -13,6 +13,7 @@ import httpx
 from backend.config import settings
 from backend.connectors.base import ConnectorStrategy
 from backend.connectors.chunkers.code_block_aware_chunker import CodeBlockAwareChunker
+from backend.exceptions import ParseError, SourceUnreachableError
 from backend.models import Chunk, SourceType
 from backend.strategies.base import ChunkerStrategy
 
@@ -143,7 +144,7 @@ def _parse_repo_url(url: str) -> tuple[str, str]:
     else:
         parts = url.strip("/").split("/")
     if len(parts) < 2:
-        raise ValueError(f"Cannot parse GitHub repo URL: {url!r}")
+        raise ParseError(f"Cannot parse GitHub repo URL: {url!r}")
     return parts[0], parts[1]
 
 
@@ -154,8 +155,17 @@ async def _list_indexable_files(
     Fetch the full recursive file tree in one API call.
     Returns filtered list of file paths worth indexing.
     """
-    resp = await client.get(f"/repos/{owner}/{repo}/git/trees/HEAD?recursive=1")
-    resp.raise_for_status()
+    try:
+        resp = await client.get(f"/repos/{owner}/{repo}/git/trees/HEAD?recursive=1")
+        resp.raise_for_status()
+    except httpx.TimeoutException as exc:
+        raise SourceUnreachableError(f"Timeout fetching tree for {owner}/{repo}") from exc
+    except httpx.HTTPStatusError as exc:
+        raise SourceUnreachableError(
+            f"GitHub API returned {exc.response.status_code} for {owner}/{repo}"
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise SourceUnreachableError(f"Network error for {owner}/{repo}: {exc}") from exc
     tree = resp.json().get("tree", [])
 
     paths = []

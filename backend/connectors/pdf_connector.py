@@ -11,6 +11,7 @@ import pymupdf4llm
 from backend.connectors.base import ConnectorStrategy
 from backend.connectors.chunkers.heading_aware_chunker import HeadingAwareChunker
 from backend.connectors.chunkers.recursive_chunker import RecursiveChunker
+from backend.exceptions import ParseError
 from backend.models import Chunk, SourceType
 from backend.strategies.base import ChunkerStrategy
 from backend.strategies.storage.s3_storage import S3Storage, is_s3_url
@@ -80,11 +81,14 @@ class PDFConnector(ConnectorStrategy):
 # ── PDF extraction helpers ─────────────────────────────────────────────────────
 
 def _extract_text_from_path(path: str) -> str:
-    doc = pymupdf.open(path)
-    pages = list(range(len(doc)))
-    doc.close()
-    md = pymupdf4llm.to_markdown(path, pages=pages, show_progress=False)
-    return md.replace("\n-----\n", "\n\n")
+    try:
+        doc = pymupdf.open(path)
+        pages = list(range(len(doc)))
+        doc.close()
+        md = pymupdf4llm.to_markdown(path, pages=pages, show_progress=False)
+        return md.replace("\n-----\n", "\n\n")
+    except Exception as exc:
+        raise ParseError(f"Failed to extract text from PDF {path}: {exc}") from exc
 
 
 def _pdf_bytes_to_markdown(data: bytes) -> str:
