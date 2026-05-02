@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 
 from ragas import EvaluationDataset, SingleTurnSample, evaluate
-from ragas.metrics import ContextRecall, Faithfulness
+from ragas.metrics.collections import ContextRecall, Faithfulness
 
 ROOT = Path(__file__).resolve().parent.parent
 GOLDEN_DIRS = [
@@ -85,9 +85,13 @@ def main() -> None:
         show_progress=True,
     )
 
+    def _mean(values: list) -> float:
+        valid = [v for v in values if v is not None]
+        return sum(valid) / len(valid) if valid else 0.0
+
     scores = {
-        "context_recall": float(result["context_recall"]),
-        "faithfulness": float(result["faithfulness"]),
+        "context_recall": _mean(result["context_recall"]),
+        "faithfulness": _mean(result["faithfulness"]),
     }
 
     print("\n── RAGAS Gate Results ────────────────────────────────────────")
