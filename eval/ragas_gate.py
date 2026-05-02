@@ -21,7 +21,9 @@ import random
 import sys
 from pathlib import Path
 
+from langchain_openai import ChatOpenAI
 from ragas import EvaluationDataset, SingleTurnSample, evaluate
+from ragas.llms import LangchainLLMWrapper
 from ragas.metrics.collections import ContextRecall, Faithfulness
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -78,20 +80,24 @@ def main() -> None:
     sample = random.sample(rows, min(args.sample, len(rows)))
     print(f"Loaded {len(rows)} total examples — evaluating {len(sample)} samples")
 
+    evaluator_llm = LangchainLLMWrapper(ChatOpenAI(model="gpt-4o-mini"))
     dataset = build_dataset(sample)
     result = evaluate(
         dataset=dataset,
-        metrics=[ContextRecall(), Faithfulness()],
+        metrics=[ContextRecall(llm=evaluator_llm), Faithfulness(llm=evaluator_llm)],
         show_progress=True,
     )
 
-    def _mean(values: list) -> float:
-        valid = [v for v in values if v is not None]
+    def _to_score(value: object) -> float:
+        """Handle both scalar (0.2.15+) and list (older 0.2.x) result formats."""
+        if isinstance(value, (int, float)):
+            return float(value)
+        valid = [v for v in value if v is not None]  # type: ignore[union-attr]
         return sum(valid) / len(valid) if valid else 0.0
 
     scores = {
-        "context_recall": _mean(result["context_recall"]),
-        "faithfulness": _mean(result["faithfulness"]),
+        "context_recall": _to_score(result["context_recall"]),
+        "faithfulness": _to_score(result["faithfulness"]),
     }
 
     print("\n── RAGAS Gate Results ────────────────────────────────────────")
