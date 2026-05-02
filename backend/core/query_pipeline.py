@@ -20,8 +20,10 @@ from collections.abc import AsyncIterator
 from uuid import UUID
 
 from backend.core.context_window_builder import ContextWindowBuilder
+from backend.exceptions import KapaError
 from backend.models import ContextWindow, QueryResult, Turn
 from backend.observers.base import QueryObserver
+from backend.observers.error_metrics import rag_errors_total
 from backend.repositories.base import ConversationRepository
 from backend.strategies.base import (
     CacheStrategy,
@@ -78,8 +80,19 @@ class QueryPipeline:
             logger.info("cache_hit tenant=%s", tenant_id)
             return cached
 
-        context = await self._build_context(query, tenant_id, conversation_id)
-        result = await self._llm.generate(context)
+        try:
+            context = await self._build_context(query, tenant_id, conversation_id)
+            result = await self._llm.generate(context)
+        except KapaError as exc:
+            rag_errors_total.labels(
+                component=exc.component, error_type=exc.error_code.value
+            ).inc()
+            logger.error(
+                "query failed: component=%s error_code=%s tenant=%s: %s",
+                exc.component, exc.error_code, tenant_id, exc,
+            )
+            raise
+
         result.conversation_id = conversation_id
 
         asyncio.create_task(self._run_observers(context, result))
@@ -102,12 +115,21 @@ class QueryPipeline:
             yield cached.answer
             return
 
-        context = await self._build_context(query, tenant_id, conversation_id)
-
-        full_answer: list[str] = []
-        async for token in self._llm.generate_stream(context):
-            full_answer.append(token)
-            yield token
+        try:
+            context = await self._build_context(query, tenant_id, conversation_id)
+            full_answer: list[str] = []
+            async for token in self._llm.generate_stream(context):
+                full_answer.append(token)
+                yield token
+        except KapaError as exc:
+            rag_errors_total.labels(
+                component=exc.component, error_type=exc.error_code.value
+            ).inc()
+            logger.error(
+                "stream failed: component=%s error_code=%s tenant=%s: %s",
+                exc.component, exc.error_code, tenant_id, exc,
+            )
+            raise
 
         result = QueryResult(
             answer="".join(full_answer),

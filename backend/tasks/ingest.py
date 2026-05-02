@@ -20,10 +20,20 @@ logger = logging.getLogger(__name__)
 )
 def run_ingestion_job(self, job_id: str) -> dict:
     """Entry point for Celery. Runs the async pipeline in a fresh event loop."""
+    from backend.exceptions import KapaError
+
     logger.info("worker picked up job=%s", job_id)
     try:
         asyncio.run(_run(job_id))
         return {"status": "completed", "job_id": job_id}
+    except KapaError as exc:
+        if exc.retryable:
+            raise self.retry(exc=exc)
+        logger.error(
+            "job=%s non-retryable failure: component=%s error_code=%s",
+            job_id, exc.component, exc.error_code,
+        )
+        return {"status": "failed", "job_id": job_id, "error_code": exc.error_code.value}
     except Exception as exc:
         logger.error("job=%s failed: %s", job_id, exc)
         raise self.retry(exc=exc)
@@ -54,6 +64,10 @@ async def _run(job_id: str) -> None:
 
         from backend.connectors.github_connector import GitHubConnector
         from backend.connectors.pdf_connector import PDFConnector
+        from backend.observers.ingestion_metrics import IngestionMetricsObserver
+        from backend.repositories.postgres_source_hash_repo import PostgresSourceHashRepository
+
+        hash_repo = PostgresSourceHashRepository(pool)
 
         factory = ConnectorFactory()
         factory.register(DocsConnector())
@@ -65,9 +79,17 @@ async def _run(job_id: str) -> None:
             sparse_encoder=TFSparseEncoder(),
             vector_db=QdrantDB(),
             job_repo=repo,
+            observers=[IngestionMetricsObserver()],
         )
         await pipeline.run(job)
-        logger.info("job=%s completed", job_id)
+
+        # Record content hash so FreshnessManager can detect stale sources
+        connector = factory.get(job.source_type)
+        content_hash = await connector.compute_content_hash(job.source_url)
+        await hash_repo.upsert(
+            job.tenant_id, job.source_url, content_hash, job.source_type.value
+        )
+        logger.info("job=%s completed source_hash recorded", job_id)
     finally:
         await pool.close()
 
