@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from uuid import UUID
 
 import asyncpg
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel, HttpUrl
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from starlette.responses import Response as _PrometheusResponse
 
 from backend.api.middleware.auth import get_tenant_id
 from backend.config import settings
@@ -15,13 +18,23 @@ from backend.repositories.postgres_source_hash_repo import PostgresSourceHashRep
 from backend.strategies.queue.celery_redis_queue import CeleryRedisQueue
 from backend.strategies.storage.s3_storage import S3Storage
 
+logger = logging.getLogger(__name__)
 app = FastAPI(title="kapa-rag ingestion service")
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics() -> _PrometheusResponse:
+    return _PrometheusResponse(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
 _queue = CeleryRedisQueue()
 _storage = S3Storage()
 
 
 @app.on_event("startup")
 async def startup() -> None:
+    from backend.logging import LogSetupFactory
+    LogSetupFactory.create(settings.environment).configure("ingestion")
+
     pool = await asyncpg.create_pool(settings.postgres_url.replace("+asyncpg", ""))
     app.state.db_pool = pool
     app.state.job_repo = PostgresIngestionJobRepository(pool)
@@ -29,6 +42,7 @@ async def startup() -> None:
 
     from backend.repositories.postgres_tenant_repo import PostgresTenantRepository
     app.state.tenant_repo = PostgresTenantRepository(pool)
+    logger.info("ingestion service started")
 
 
 @app.on_event("shutdown")

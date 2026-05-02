@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import logging
 from uuid import UUID, uuid4
 
 import asyncpg
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from starlette.responses import Response as _PrometheusResponse
 
 from backend.api.middleware.auth import get_tenant_id
 from backend.config import settings
@@ -22,17 +25,27 @@ from backend.strategies.llm.openai_llm import OpenAILLM
 from backend.strategies.reranker.cohere_reranker import CohereReranker
 from backend.strategies.vectordb.qdrant_db import QdrantDB
 
+logger = logging.getLogger(__name__)
 app = FastAPI(title="kapa-rag query service")
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics() -> _PrometheusResponse:
+    return _PrometheusResponse(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 @app.on_event("startup")
 async def startup() -> None:
+    from backend.logging import LogSetupFactory
+    LogSetupFactory.create(settings.environment).configure("query")
+
     pool = await asyncpg.create_pool(settings.postgres_url.replace("+asyncpg", ""))
     app.state.db_pool = pool
 
     from backend.repositories.postgres_tenant_repo import PostgresTenantRepository
     app.state.tenant_repo = PostgresTenantRepository(pool)
 
+    logger.info("query service started")
     cache = RedisCache()
     app.state.pipeline = QueryPipeline(
         llm=OpenAILLM(),

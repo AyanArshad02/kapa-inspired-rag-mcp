@@ -26,11 +26,15 @@ app = FastAPI(title="kapa-rag webhook service")
 
 @app.on_event("startup")
 async def startup() -> None:
+    from backend.logging import LogSetupFactory
+    LogSetupFactory.create(settings.environment).configure("webhook")
+
     pool = await asyncpg.create_pool(settings.postgres_url.replace("+asyncpg", ""))
     app.state.db_pool = pool
     app.state.job_repo = PostgresIngestionJobRepository(pool)
     app.state.hash_repo = PostgresSourceHashRepository(pool)
     app.state.webhook_secret_repo = PostgresWebhookSecretRepository(pool)
+    logger.info("webhook service started")
 
 
 @app.on_event("shutdown")
