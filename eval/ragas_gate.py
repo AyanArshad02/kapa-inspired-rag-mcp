@@ -24,7 +24,7 @@ from pathlib import Path
 from langchain_openai import ChatOpenAI
 from ragas import EvaluationDataset, SingleTurnSample, evaluate
 from ragas.llms import LangchainLLMWrapper
-from ragas.metrics.collections import ContextRecall, Faithfulness
+from ragas.metrics import ContextRecall, Faithfulness
 
 ROOT = Path(__file__).resolve().parent.parent
 GOLDEN_DIRS = [
