@@ -3,8 +3,6 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
-import pytest
-
 from backend.models import Chunk, QueryResult, SourceType
 from backend.strategies.cache.redis_cache import _deserialize, _serialize
 

@@ -72,10 +72,10 @@ class TestOpenAILLM:
             assert chunk.content in last_msg
 
     def test_build_messages_includes_conversation_history(self):
+        from uuid import uuid4
+
         from backend.models import Turn
         from backend.strategies.llm.openai_llm import _build_messages
-
-        from uuid import uuid4
         ctx = _make_context()
         conv_id = uuid4()
         ctx.conversation_history = [

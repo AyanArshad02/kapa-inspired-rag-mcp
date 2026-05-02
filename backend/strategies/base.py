@@ -6,7 +6,6 @@ from typing import Any
 
 from backend.models import Chunk, ContextWindow, IngestionJob, QueryResult
 
-
 # ---------------------------------------------------------------------------
 # Embedding
 # ---------------------------------------------------------------------------
@@ -170,7 +169,6 @@ class QueueStrategy(ABC):
 
 # keep the import clean
 from backend.models import IngestionStatus  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Cache

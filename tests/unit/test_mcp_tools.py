@@ -3,8 +3,6 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
-import pytest
-
 from backend.models import Chunk, QueryResult, SourceType
 
 

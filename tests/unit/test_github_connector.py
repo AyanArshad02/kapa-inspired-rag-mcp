@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from backend.exceptions import ParseError
 from backend.models import SourceType
-
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -51,7 +51,7 @@ class TestParseRepoUrl:
     def test_invalid_url_raises(self):
         from backend.connectors.github_connector import _parse_repo_url
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ParseError):
             _parse_repo_url("not-a-valid-url")
 
 

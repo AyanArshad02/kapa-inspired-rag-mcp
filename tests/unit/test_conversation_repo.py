@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
-
-import pytest
 
 from backend.models import Turn
 from backend.repositories.postgres_conversation_repo import _pair_rows

@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import pytest
-
-from backend.core.context_window_builder import ContextWindowBuilder, _count
-from backend.models import Chunk, SourceType, Turn
 from uuid import uuid4
+
+from backend.core.context_window_builder import ContextWindowBuilder
+from backend.models import Chunk, SourceType, Turn
 
 
 def _chunk(content: str) -> Chunk:

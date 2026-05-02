@@ -1,4 +1,3 @@
-import pytest
 
 from backend.connectors.chunkers.heading_aware_chunker import HeadingAwareChunker
 from backend.connectors.chunkers.sliding_window_chunker import SlidingWindowChunker

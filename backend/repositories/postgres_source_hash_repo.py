@@ -55,7 +55,8 @@ class PostgresSourceHashRepository(SourceHashRepository):
     async def list_by_tenant(self, tenant_id: str) -> list[dict]:
         async with self._pool.acquire() as conn:
             rows = await conn.fetch(
-                "SELECT source_url, source_type FROM source_hashes WHERE tenant_id = $1 ORDER BY updated_at DESC",
+                "SELECT source_url, source_type FROM source_hashes"
+                " WHERE tenant_id = $1 ORDER BY updated_at DESC",
                 tenant_id,
             )
         return [{"source_url": r["source_url"], "source_type": r["source_type"]} for r in rows]

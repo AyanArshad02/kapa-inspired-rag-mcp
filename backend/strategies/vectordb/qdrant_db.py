@@ -8,8 +8,6 @@ from qdrant_client.models import (
     FieldCondition,
     Filter,
     MatchValue,
-    NamedSparseVector,
-    NamedVector,
     PointStruct,
     SparseIndexParams,
     SparseVector,
@@ -63,7 +61,7 @@ class QdrantDB(VectorDBStrategy):
         sparse_values: list[float],
         top_k: int = 20,
     ) -> list[Chunk]:
-        from qdrant_client.models import FusionQuery, Fusion, Prefetch
+        from qdrant_client.models import Fusion, FusionQuery, Prefetch
 
         try:
             results = await self._circuit.call(

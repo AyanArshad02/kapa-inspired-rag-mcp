@@ -45,8 +45,8 @@ class ProdLogSetup(LogSetup):
 
         # CloudWatch handler — primary sink for structured log storage
         try:
-            import watchtower
             import boto3
+            import watchtower
 
             cw_client = boto3.client("logs", region_name=settings.s3_region)
             cw_handler = watchtower.CloudWatchLogHandler(

@@ -6,8 +6,8 @@ from uuid import UUID
 
 import asyncpg
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
-from pydantic import BaseModel, HttpUrl
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from pydantic import BaseModel, HttpUrl
 from starlette.responses import Response as _PrometheusResponse
 
 from backend.api.middleware.auth import get_tenant_id

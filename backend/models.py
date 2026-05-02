@@ -2,19 +2,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 from uuid import UUID, uuid4
 
 
-class IngestionStatus(str, Enum):
+class IngestionStatus(StrEnum):
     PENDING = "pending"
     PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
 
 
-class SourceType(str, Enum):
+class SourceType(StrEnum):
     DOCS_SITE = "docs_site"
     GITHUB = "github"
     PDF = "pdf"

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from backend.connectors.factory import ConnectorFactory
-from backend.models import IngestionJob, IngestionStatus, SourceType
+from backend.models import IngestionJob, SourceType
 from backend.repositories.base import IngestionJobRepository, SourceHashRepository
 from backend.strategies.base import EmbeddingStrategy, SparseEncoderStrategy, VectorDBStrategy
 

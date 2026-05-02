@@ -68,6 +68,12 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
 
+[tool.ruff.lint.per-file-ignores]
+# Long string literals in prompts and test fixtures cannot be broken
+"backend/strategies/llm/openai_llm.py" = ["E501"]
+"tests/unit/test_chunkers.py" = ["E501"]
+"tests/unit/test_github_connector.py" = ["E501"]
+
 [tool.mypy]
 python_version = "3.11"
 strict = false
@@ -78,4 +84,34 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 markers = [
     "integration: requires docker-compose services (postgres + qdrant)",
+]
+
+[tool.coverage.run]
+omit = [
+    # FastAPI route handlers — covered by integration tests, not unit tests
+    "backend/api/*",
+    # Logging infrastructure — no business logic
+    "backend/logging/*",
+    # App entry points
+    "backend/main.py",
+    "backend/mcp/server.py",
+    # Observers that require live services (Redis, LangSmith, Prometheus push)
+    "backend/observers/cache_observer.py",
+    "backend/observers/metrics_observer.py",
+    "backend/observers/trace_observer.py",
+    # PostgreSQL repositories — covered by integration tests
+    "backend/repositories/postgres_ingestion_job_repo.py",
+    "backend/repositories/postgres_source_hash_repo.py",
+    "backend/repositories/postgres_tenant_repo.py",
+    "backend/repositories/postgres_webhook_secret_repo.py",
+    # Queue / Celery — requires Redis broker
+    "backend/strategies/queue/*",
+    # Qdrant strategy — requires running Qdrant
+    "backend/strategies/vectordb/qdrant_db.py",
+    # Celery task entry points — integration layer
+    "backend/tasks/*",
+    # Docs connector — requires network
+    "backend/connectors/docs_connector.py",
+    # Ingestion pipeline — covered by integration tests
+    "backend/core/ingestion_pipeline.py",
 ]

@@ -12,10 +12,10 @@ Hierarchy contract:
 """
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class ErrorCode(str, Enum):
+class ErrorCode(StrEnum):
     # ── LLM ──────────────────────────────────────────────────────────────────
     LLM_TIMEOUT = "LLM_TIMEOUT"
     LLM_RATE_LIMIT = "LLM_RATE_LIMIT"

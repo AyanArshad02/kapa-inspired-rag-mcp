@@ -20,7 +20,8 @@ _TOP_K_TOKENS = 128  # keep only the K highest-weight tokens per document
 
 class TFSparseEncoder(SparseEncoderStrategy):
     """
-    Converts text to sparse token-frequency vectors using tiktoken token IDs as indices. This is a simple, fast, and dependency-free baseline for sparse encoding.
+    Converts text to sparse token-frequency vectors using tiktoken token IDs as indices.
+    This is a simple, fast, and dependency-free baseline for sparse encoding.
     Tokens are tiktoken IDs so indices are consistent across all documents.
     """
 

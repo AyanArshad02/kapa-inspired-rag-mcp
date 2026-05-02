@@ -6,7 +6,6 @@ import pytest
 
 from backend.models import IngestionJob, IngestionStatus, SourceType
 
-
 # ── helpers ────────────────────────────────────────────────────────────────────
 
 def _make_freshness_manager(
@@ -93,7 +92,9 @@ class TestCheckAndRefresh:
         with patch.object(fm, "_enqueue_job", new=AsyncMock()):
             await fm.check_and_refresh("t1", "owner/repo", SourceType.GITHUB)
 
-        hash_repo.upsert.assert_called_once_with("t1", "owner/repo", "new_hash", SourceType.GITHUB.value)
+        hash_repo.upsert.assert_called_once_with(
+            "t1", "owner/repo", "new_hash", SourceType.GITHUB.value
+        )
 
     @pytest.mark.asyncio
     async def test_first_time_source_triggers_job(self):

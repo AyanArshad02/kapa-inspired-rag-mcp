@@ -54,7 +54,9 @@ class IngestionPipeline:
             chunks: list[Chunk] = []
 
             async for chunk in connector.fetch_chunks(job.source_url, job.tenant_id):
-                chunk.id = _deterministic_id(job.tenant_id, job.source_url, chunk.metadata.get("chunk_index", 0))
+                chunk.id = _deterministic_id(
+                    job.tenant_id, job.source_url, chunk.metadata.get("chunk_index", 0)
+                )
                 chunks.append(chunk)
 
                 if len(chunks) >= _EMBED_BATCH_SIZE:

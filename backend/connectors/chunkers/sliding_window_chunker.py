@@ -22,7 +22,6 @@ class SlidingWindowChunker(ChunkerStrategy):
         tokens = self._enc.encode(content)
         chunks: list[Chunk] = []
         step = self._window - self._overlap
-        idx = 0
 
         for i, start in enumerate(range(0, len(tokens), step)):
             window = tokens[start : start + self._window]

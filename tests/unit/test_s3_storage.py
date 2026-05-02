@@ -4,7 +4,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ── helpers ────────────────────────────────────────────────────────────────────
 
 def _make_storage():
@@ -115,8 +114,8 @@ class TestPDFConnectorRouting:
     async def test_md_file_uses_heading_aware_chunker(self):
         from unittest.mock import AsyncMock, patch
 
-        from backend.connectors.pdf_connector import PDFConnector
         from backend.connectors.chunkers.heading_aware_chunker import HeadingAwareChunker
+        from backend.connectors.pdf_connector import PDFConnector
         from backend.models import Chunk, SourceType
 
         fake_chunk = Chunk(content="section text", source_type=SourceType.PDF)
@@ -137,8 +136,8 @@ class TestPDFConnectorRouting:
     async def test_pdf_file_uses_recursive_chunker(self):
         from unittest.mock import AsyncMock, patch
 
-        from backend.connectors.pdf_connector import PDFConnector
         from backend.connectors.chunkers.recursive_chunker import RecursiveChunker
+        from backend.connectors.pdf_connector import PDFConnector
         from backend.models import Chunk, SourceType
 
         fake_chunk = Chunk(content="pdf text", source_type=SourceType.PDF)

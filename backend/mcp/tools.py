@@ -11,7 +11,6 @@ from bs4 import BeautifulSoup
 from backend.connectors.chunkers.heading_aware_chunker import HeadingAwareChunker
 from backend.core.context_window_builder import ContextWindowBuilder
 from backend.core.query_pipeline import QueryPipeline
-from backend.models import SourceType
 from backend.strategies.embedding.openai_embedding import OpenAIEmbedding
 from backend.strategies.llm.openai_llm import OpenAILLM
 
@@ -105,7 +104,9 @@ async def fetch_and_query_online_docs_impl(url: str, query: str) -> str:
     q_norm = q_vec / (np.linalg.norm(q_vec) + 1e-9)
     c_norms = c_matrix / (np.linalg.norm(c_matrix, axis=1, keepdims=True) + 1e-9)
     scores = (c_norms @ q_norm).tolist()
-    top_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:_EPHEMERAL_TOP_K]
+    top_indices = sorted(
+        range(len(scores)), key=lambda i: scores[i], reverse=True
+    )[:_EPHEMERAL_TOP_K]
     top_chunks = [chunks[i] for i in top_indices]
 
     # 6. Build context window + generate answer

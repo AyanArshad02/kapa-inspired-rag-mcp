@@ -1,4 +1,3 @@
-import pytest
 
 from backend.strategies.embedding.tf_sparse_encoder import TFSparseEncoder
 

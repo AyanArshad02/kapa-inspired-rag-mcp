@@ -21,7 +21,9 @@ class OpenAIEmbedding(EmbeddingStrategy):
     def __init__(self) -> None:
         self._client = AsyncOpenAI(api_key=settings.openai_api_key)
         self._model = settings.openai_embedding_model
-        self._circuit = CircuitBreaker("openai-embedding", failure_threshold=5, recovery_timeout=30.0)
+        self._circuit = CircuitBreaker(
+            "openai-embedding", failure_threshold=5, recovery_timeout=30.0
+        )
 
     @property
     def dimension(self) -> int:

@@ -1,4 +1,5 @@
 import asyncio
+
 import pytest
 
 from backend.core.circuit_breaker import CircuitBreaker, CircuitOpenError, CircuitState
