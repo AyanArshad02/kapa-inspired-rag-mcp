@@ -15,5 +15,8 @@ CMD ["uvicorn", "backend.api.query_service:app", "--host", "0.0.0.0", "--port", 
 FROM base AS mcp
 CMD ["python", "-m", "backend.mcp.server"]
 
+FROM base AS webhook
+CMD ["uvicorn", "backend.api.webhook:app", "--host", "0.0.0.0", "--port", "8003"]
+
 FROM base AS celery
 # CMD is set per-container in docker-compose.yml

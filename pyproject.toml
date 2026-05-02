@@ -44,6 +44,7 @@ dependencies = [
     # Observability
     "langsmith>=0.1.77",
     "prometheus-client>=0.20.0",
+    "watchtower>=3.0.0",
 ]
 
 [project.optional-dependencies]

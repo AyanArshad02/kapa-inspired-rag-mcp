@@ -20,19 +20,6 @@ import uvicorn
 from backend.config import settings
 
 
-def _configure_logging() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-        datefmt="%H:%M:%S",
-        stream=sys.stdout,
-    )
-    # suppress noisy third-party loggers
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
-    logging.getLogger("openai").setLevel(logging.WARNING)
-
-
 def _validate_config() -> None:
     """Fail fast if required env vars are missing before any service starts."""
     errors = []
@@ -53,8 +40,6 @@ _SERVICE_MAP = {
 
 
 def main() -> None:
-    _configure_logging()
-
     parser = argparse.ArgumentParser(description="kapa-rag service runner")
     parser.add_argument(
         "--service",

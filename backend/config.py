@@ -31,6 +31,10 @@ class Settings(BaseSettings):
 
     service_port: int = 8000
 
+    # Observability
+    environment: str = "dev"
+    cloudwatch_log_group: str = "/kapa-rag/production"
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

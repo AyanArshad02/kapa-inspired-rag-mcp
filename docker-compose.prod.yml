@@ -1,0 +1,268 @@
+# Production compose — images pulled from ECR, no build context.
+# All secrets injected via .env file on the EC2 host.
+#
+# Required env vars (set in /home/ec2-user/kapa-rag-mcp/.env):
+#   ECR_REGISTRY     — AWS account ID.dkr.ecr.<region>.amazonaws.com
+#   IMAGE_TAG        — git short SHA, set by the deploy workflow
+#   POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB
+#   OPENAI_API_KEY / COHERE_API_KEY
+#   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / S3_REGION / S3_BUCKET
+#   LANGSMITH_API_KEY (optional)
+
+services:
+
+  # ── Storage Layer ────────────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: kapa_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-kapa_rag}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    # No port binding — only reachable on the internal Docker network.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-kapa_rag}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - kapa_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: kapa_redis
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    # No port binding — only reachable on the internal Docker network.
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - kapa_net
+
+  qdrant:
+    image: qdrant/qdrant:v1.13.6
+    container_name: kapa_qdrant
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: 6334
+    # No port binding — only reachable on the internal Docker network.
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 1 bash -c 'echo > /dev/tcp/localhost/6333' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - kapa_net
+
+  # ── Application Layer ────────────────────────────────────────────────────────
+
+  ingestion-service:
+    image: ${ECR_REGISTRY}/kapa-ingestion:${IMAGE_TAG:-latest}
+    container_name: kapa_ingestion
+    ports:
+      - "8001:8001"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - COHERE_API_KEY=${COHERE_API_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - QDRANT_URL=http://qdrant:6333
+      - REDIS_URL=redis://redis:6379
+      - POSTGRES_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kapa_rag}
+      - S3_BUCKET=${S3_BUCKET:-kapa-rag-uploads}
+      - S3_REGION=${S3_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - SERVICE_PORT=8001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    restart: unless-stopped
+    networks:
+      - kapa_net
+
+  webhook-service:
+    image: ${ECR_REGISTRY}/kapa-webhook:${IMAGE_TAG:-latest}
+    container_name: kapa_webhook
+    ports:
+      - "8003:8003"
+    command: ["uvicorn", "backend.api.webhook:app", "--host", "0.0.0.0", "--port", "8003"]
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - COHERE_API_KEY=${COHERE_API_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - QDRANT_URL=http://qdrant:6333
+      - REDIS_URL=redis://redis:6379
+      - POSTGRES_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kapa_rag}
+      - SERVICE_PORT=8003
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - kapa_net
+
+  celery-worker:
+    image: ${ECR_REGISTRY}/kapa-celery:${IMAGE_TAG:-latest}
+    container_name: kapa_celery
+    command: celery -A backend.strategies.queue.celery_redis_queue worker --loglevel=info --concurrency=4
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - COHERE_API_KEY=${COHERE_API_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - QDRANT_URL=http://qdrant:6333
+      - REDIS_URL=redis://redis:6379
+      - POSTGRES_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kapa_rag}
+      - S3_BUCKET=${S3_BUCKET:-kapa-rag-uploads}
+      - S3_REGION=${S3_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    depends_on:
+      - redis
+      - postgres
+      - qdrant
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+    restart: unless-stopped
+    networks:
+      - kapa_net
+
+  celery-beat:
+    image: ${ECR_REGISTRY}/kapa-celery:${IMAGE_TAG:-latest}
+    container_name: kapa_celery_beat
+    command: celery -A backend.strategies.queue.celery_redis_queue beat --loglevel=info
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - POSTGRES_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kapa_rag}
+    depends_on:
+      - redis
+      - postgres
+    restart: unless-stopped
+    networks:
+      - kapa_net
+
+  query-service:
+    image: ${ECR_REGISTRY}/kapa-query:${IMAGE_TAG:-latest}
+    container_name: kapa_query
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - COHERE_API_KEY=${COHERE_API_KEY}
+      - QDRANT_URL=http://qdrant:6333
+      - REDIS_URL=redis://redis:6379
+      - POSTGRES_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kapa_rag}
+      - LANGSMITH_API_KEY=${LANGSMITH_API_KEY:-}
+      - SERVICE_PORT=8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - kapa_net
+
+  mcp-server:
+    image: ${ECR_REGISTRY}/kapa-mcp:${IMAGE_TAG:-latest}
+    container_name: kapa_mcp
+    ports:
+      - "8002:8002"
+    environment:
+      - QUERY_SERVICE_URL=http://query-service:8000
+      - SERVICE_PORT=8002
+    depends_on:
+      query-service:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - kapa_net
+
+  # ── Observability Layer ──────────────────────────────────────────────────────
+
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: kapa_prometheus
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+    # No port binding — access via SSH tunnel: ssh -L 9090:localhost:9090 ec2-user@<host>
+    restart: unless-stopped
+    networks:
+      - kapa_net
+
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: kapa_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_SERVER_ROOT_URL=http://${EC2_HOST:-localhost}:3000
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - kapa_net
+
+networks:
+  kapa_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  qdrant_data:
+  prometheus_data:
+  grafana_data:
