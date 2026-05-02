@@ -50,7 +50,7 @@ def build_dataset(rows: list[dict]) -> EvaluationDataset:
         samples.append(
             SingleTurnSample(
                 user_input=r["question"],
-                retrieved_contexts=[r["source_text"]],
+                retrieved_contexts=[r.get("source_text") or r.get("source_chunk", "")],
                 response=r["answer"],
                 reference=r["answer"],
             )
