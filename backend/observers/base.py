@@ -1,19 +1,14 @@
-"""Observer interface for post-query side effects.
+"""Observer interfaces for post-query and post-ingestion side effects.
 
 Observers are fire-and-forget. They run after the response is already sent
 via asyncio.create_task — a failure here must never reach the caller.
-
-Three concrete implementations come in Phase 2:
-  CacheObserver   — writes result to Redis
-  TraceObserver   — sends trace to LangSmith
-  MetricsObserver — increments Prometheus counters
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from backend.models import ContextWindow, QueryResult
+from backend.models import ContextWindow, IngestionJob, QueryResult
 
 
 class QueryObserver(ABC):
@@ -21,4 +16,16 @@ class QueryObserver(ABC):
 
     @abstractmethod
     async def notify(self, context: ContextWindow, result: QueryResult) -> None:
+        ...
+
+
+class IngestionObserver(ABC):
+    """Notified on ingestion job completion or failure."""
+
+    @abstractmethod
+    async def on_job_completed(self, job: IngestionJob, chunks_processed: int) -> None:
+        ...
+
+    @abstractmethod
+    async def on_job_failed(self, job: IngestionJob, error: Exception) -> None:
         ...
