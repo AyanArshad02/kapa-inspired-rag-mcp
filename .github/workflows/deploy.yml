@@ -1,0 +1,164 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false  # never cancel a running deploy
+
+jobs:
+  build-and-push:
+    name: Build + Push to ECR
+    runs-on: ubuntu-latest
+
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: meta
+        run: echo "tag=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # BuildKit cache speeds up successive pushes by reusing the shared base layer.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push — query service
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: query
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/kapa-query:${{ steps.meta.outputs.tag }}
+            ${{ steps.login-ecr.outputs.registry }}/kapa-query:latest
+          cache-from: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/kapa-query:cache
+          cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/kapa-query:cache,mode=max
+
+      - name: Build and push — ingestion service
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: ingestion
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/kapa-ingestion:${{ steps.meta.outputs.tag }}
+            ${{ steps.login-ecr.outputs.registry }}/kapa-ingestion:latest
+          cache-from: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/kapa-ingestion:cache
+          cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/kapa-ingestion:cache,mode=max
+
+      - name: Build and push — webhook service
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: webhook
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/kapa-webhook:${{ steps.meta.outputs.tag }}
+            ${{ steps.login-ecr.outputs.registry }}/kapa-webhook:latest
+          cache-from: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/kapa-webhook:cache
+          cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/kapa-webhook:cache,mode=max
+
+      - name: Build and push — celery worker
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: celery
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/kapa-celery:${{ steps.meta.outputs.tag }}
+            ${{ steps.login-ecr.outputs.registry }}/kapa-celery:latest
+          cache-from: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/kapa-celery:cache
+          cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/kapa-celery:cache,mode=max
+
+      - name: Build and push — MCP server
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: mcp
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/kapa-mcp:${{ steps.meta.outputs.tag }}
+            ${{ steps.login-ecr.outputs.registry }}/kapa-mcp:latest
+          cache-from: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/kapa-mcp:cache
+          cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/kapa-mcp:cache,mode=max
+
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy docker-compose.prod.yml to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "docker-compose.prod.yml,infra/"
+          target: "/home/${{ secrets.EC2_USER }}/kapa-rag-mcp"
+
+      - name: Deploy on EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: IMAGE_TAG,ECR_REGISTRY,AWS_REGION
+          script: |
+            set -e
+
+            cd /home/${{ secrets.EC2_USER }}/kapa-rag-mcp
+
+            # Pull fresh images from ECR
+            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
+              | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+
+            export IMAGE_TAG="${{ needs.build-and-push.outputs.image_tag }}"
+            export ECR_REGISTRY="${{ secrets.ECR_REGISTRY }}"
+
+            docker compose -f docker-compose.prod.yml pull
+
+            # Rolling update: bring up new containers, let Docker handle the cutover
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+            # Wait for query service health check
+            echo "Waiting for query service to become healthy..."
+            for i in $(seq 1 12); do
+              if curl -sf http://localhost:8000/health > /dev/null; then
+                echo "Health check passed."
+                break
+              fi
+              if [ "$i" -eq 12 ]; then
+                echo "ERROR: Health check failed after 60s" >&2
+                docker compose -f docker-compose.prod.yml logs query-service --tail=50
+                exit 1
+              fi
+              sleep 5
+            done
+
+            # Prune old images to reclaim disk space
+            docker image prune -f --filter "until=24h"
+
+      - name: Notify success
+        if: success()
+        run: |
+          echo "Deployed ${{ needs.build-and-push.outputs.image_tag }} to production."
