@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from openai import AsyncOpenAI
+from openai import APIError, APITimeoutError, AsyncOpenAI, BadRequestError, RateLimitError
 
 from backend.config import settings
-from backend.core.circuit_breaker import CircuitBreaker
+from backend.core.circuit_breaker import CircuitBreaker, CircuitOpenError
+from backend.exceptions import EmbeddingBatchTooLargeError, EmbeddingFailedError
 from backend.strategies.base import EmbeddingStrategy
 
 _BATCH_SIZE = 100  # SENDIG 100 CHUNKS IN PER API REQUEST
@@ -34,10 +35,18 @@ class OpenAIEmbedding(EmbeddingStrategy):
         return results
 
     async def _call_api(self, texts: list[str]) -> list[list[float]]:
-        response = await self._client.embeddings.create(
-            model=self._model,
-            input=texts,
-        )
+        try:
+            response = await self._client.embeddings.create(
+                model=self._model,
+                input=texts,
+            )
+        except CircuitOpenError as exc:
+            raise EmbeddingFailedError("Embedding circuit open — too many recent failures") from exc
+        except BadRequestError as exc:
+            raise EmbeddingBatchTooLargeError(str(exc)) from exc
+        except (RateLimitError, APITimeoutError, APIError) as exc:
+            raise EmbeddingFailedError(str(exc)) from exc
+
         return [item.embedding for item in sorted(response.data, key=lambda x: x.index)]
 
 

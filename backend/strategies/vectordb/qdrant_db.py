@@ -18,7 +18,8 @@ from qdrant_client.models import (
 )
 
 from backend.config import settings
-from backend.core.circuit_breaker import CircuitBreaker
+from backend.core.circuit_breaker import CircuitBreaker, CircuitOpenError
+from backend.exceptions import VectorDBConnectionError, VectorDBQueryError
 from backend.models import Chunk, SourceType
 from backend.strategies.base import VectorDBStrategy
 
@@ -43,11 +44,16 @@ class QdrantDB(VectorDBStrategy):
             return
         tenant_id = chunks[0].tenant_id
         points = [_chunk_to_point(c) for c in chunks]
-        await self._circuit.call(
-            self._client.upsert,
-            collection_name=_collection(tenant_id),
-            points=points,
-        )
+        try:
+            await self._circuit.call(
+                self._client.upsert,
+                collection_name=_collection(tenant_id),
+                points=points,
+            )
+        except CircuitOpenError as exc:
+            raise VectorDBConnectionError("Qdrant circuit open") from exc
+        except Exception as exc:
+            raise _classify_qdrant_error(exc) from exc
 
     async def hybrid_search(
         self,
@@ -57,33 +63,44 @@ class QdrantDB(VectorDBStrategy):
         sparse_values: list[float],
         top_k: int = 20,
     ) -> list[Chunk]:
-        from qdrant_client.models import Prefetch, Query, FusionQuery, Fusion
+        from qdrant_client.models import FusionQuery, Fusion, Prefetch
 
-        results = await self._circuit.call(
-            self._client.query_points,
-            collection_name=_collection(tenant_id),
-            prefetch=[
-                Prefetch(query=dense_vector, using=_DENSE_VECTOR_NAME, limit=top_k),
-                Prefetch(
-                    query=SparseVector(indices=sparse_indices, values=sparse_values),
-                    using=_SPARSE_VECTOR_NAME,
-                    limit=top_k,
-                ),
-            ],
-            query=FusionQuery(fusion=Fusion.RRF),
-            limit=top_k,
-            with_payload=True,
-        )
+        try:
+            results = await self._circuit.call(
+                self._client.query_points,
+                collection_name=_collection(tenant_id),
+                prefetch=[
+                    Prefetch(query=dense_vector, using=_DENSE_VECTOR_NAME, limit=top_k),
+                    Prefetch(
+                        query=SparseVector(indices=sparse_indices, values=sparse_values),
+                        using=_SPARSE_VECTOR_NAME,
+                        limit=top_k,
+                    ),
+                ],
+                query=FusionQuery(fusion=Fusion.RRF),
+                limit=top_k,
+                with_payload=True,
+            )
+        except CircuitOpenError as exc:
+            raise VectorDBConnectionError("Qdrant circuit open") from exc
+        except Exception as exc:
+            raise _classify_qdrant_error(exc) from exc
+
         return [_point_to_chunk(r) for r in results.points]
 
     async def delete_chunks(self, tenant_id: str, chunk_ids: list[str]) -> None:
         from qdrant_client.models import PointIdsList
 
-        await self._circuit.call(
-            self._client.delete,
-            collection_name=_collection(tenant_id),
-            points_selector=PointIdsList(points=chunk_ids),
-        )
+        try:
+            await self._circuit.call(
+                self._client.delete,
+                collection_name=_collection(tenant_id),
+                points_selector=PointIdsList(points=chunk_ids),
+            )
+        except CircuitOpenError as exc:
+            raise VectorDBConnectionError("Qdrant circuit open") from exc
+        except Exception as exc:
+            raise _classify_qdrant_error(exc) from exc
 
     async def delete_by_filter(self, tenant_id: str, filter_dict: dict[str, str]) -> None:
         from qdrant_client.models import FilterSelector
@@ -92,32 +109,51 @@ class QdrantDB(VectorDBStrategy):
             FieldCondition(key=k, match=MatchValue(value=v))
             for k, v in filter_dict.items()
         ]
-        await self._circuit.call(
-            self._client.delete,
-            collection_name=_collection(tenant_id),
-            points_selector=FilterSelector(filter=Filter(must=conditions)),
-        )
+        try:
+            await self._circuit.call(
+                self._client.delete,
+                collection_name=_collection(tenant_id),
+                points_selector=FilterSelector(filter=Filter(must=conditions)),
+            )
+        except CircuitOpenError as exc:
+            raise VectorDBConnectionError("Qdrant circuit open") from exc
+        except Exception as exc:
+            raise _classify_qdrant_error(exc) from exc
 
     async def collection_exists(self, tenant_id: str) -> bool:
         # Avoid /collections/{name}/exists which was added post-1.7.4
-        result = await self._client.get_collections()
+        try:
+            result = await self._client.get_collections()
+        except Exception as exc:
+            raise VectorDBConnectionError(str(exc)) from exc
         return _collection(tenant_id) in {c.name for c in result.collections}
 
     async def create_collection(self, tenant_id: str) -> None:
-        await self._client.create_collection(
-            collection_name=_collection(tenant_id),
-            vectors_config={
-                _DENSE_VECTOR_NAME: VectorParams(
-                    size=self._dimension,
-                    distance=Distance.COSINE,
-                ),
-            },
-            sparse_vectors_config={
-                _SPARSE_VECTOR_NAME: SparseVectorParams(
-                    index=SparseIndexParams(on_disk=False)
-                ),
-            },
-        )
+        try:
+            await self._client.create_collection(
+                collection_name=_collection(tenant_id),
+                vectors_config={
+                    _DENSE_VECTOR_NAME: VectorParams(
+                        size=self._dimension,
+                        distance=Distance.COSINE,
+                    ),
+                },
+                sparse_vectors_config={
+                    _SPARSE_VECTOR_NAME: SparseVectorParams(
+                        index=SparseIndexParams(on_disk=False)
+                    ),
+                },
+            )
+        except Exception as exc:
+            raise VectorDBConnectionError(str(exc)) from exc
+
+
+def _classify_qdrant_error(exc: Exception) -> VectorDBConnectionError | VectorDBQueryError:
+    """Map raw Qdrant / httpx exceptions to our typed hierarchy."""
+    name = type(exc).__name__
+    if any(t in name for t in ("Connect", "Timeout", "Network", "Connection", "Unavailable")):
+        return VectorDBConnectionError(str(exc))
+    return VectorDBQueryError(str(exc))
 
 
 def _collection(tenant_id: str) -> str:

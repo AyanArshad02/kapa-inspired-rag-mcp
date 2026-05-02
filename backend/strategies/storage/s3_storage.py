@@ -6,9 +6,10 @@ import uuid
 from pathlib import Path
 
 import boto3
-from botocore.exceptions import ClientError
+from botocore.exceptions import BotoCoreError, ClientError
 
 from backend.config import settings
+from backend.exceptions import S3DeleteError, S3DownloadError, S3UploadError
 
 logger = logging.getLogger(__name__)
 
@@ -70,23 +71,32 @@ class S3Storage:
 
     def _upload_sync(self, data: bytes, key: str, suffix: str) -> None:
         content_type = _content_type(suffix)
-        self._s3.put_object(
-            Bucket=self._bucket,
-            Key=key,
-            Body=data,
-            ContentType=content_type,
-        )
+        try:
+            self._s3.put_object(
+                Bucket=self._bucket,
+                Key=key,
+                Body=data,
+                ContentType=content_type,
+            )
+        except (ClientError, BotoCoreError) as exc:
+            raise S3UploadError(str(exc)) from exc
 
     def _download_sync(self, bucket: str, key: str) -> bytes:
-        resp = self._s3.get_object(Bucket=bucket, Key=key)
-        return resp["Body"].read()
+        try:
+            resp = self._s3.get_object(Bucket=bucket, Key=key)
+            return resp["Body"].read()
+        except (ClientError, BotoCoreError) as exc:
+            raise S3DownloadError(str(exc)) from exc
 
     def _delete_sync(self, bucket: str, key: str) -> None:
         try:
             self._s3.delete_object(Bucket=bucket, Key=key)
         except ClientError as exc:
-            if exc.response["Error"]["Code"] != "NoSuchKey":
-                raise
+            if exc.response["Error"]["Code"] == "NoSuchKey":
+                return
+            raise S3DeleteError(str(exc)) from exc
+        except BotoCoreError as exc:
+            raise S3DeleteError(str(exc)) from exc
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
