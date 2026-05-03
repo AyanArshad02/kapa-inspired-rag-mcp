@@ -1,22 +1,27 @@
 """CI quality gate: verifies the golden eval dataset against RAGAS thresholds.
 
 Uses source_text as the retrieved context and the stored answer as the response.
-This is a dataset health check — if someone edits the golden set incorrectly, this fails.
+This is a DATASET HEALTH CHECK — if someone edits the golden set incorrectly,
+this fails.
 
-Thresholds (calibrated from experiment notebooks 04_ragas_baseline, RAGAS 0.1.x):
-  context_recall  >= 0.75  (ground truth info covered by source_text)
-  faithfulness    >= 0.70  (stored answer is faithful to source_text)
+WHY context_precision and NOT faithfulness/context_recall:
+  context_precision asks: "is this source_text relevant to this question?"
+  For a clean golden dataset, source_text was specifically chosen as the source
+  for each question, so precision should be ~1.0.
+  If someone corrupts source_text (replaces it with garbage), precision drops to ~0.
 
-IMPORTANT — version pinning:
-  This gate uses ragas>=0.1.14,<0.2.0 (same version as the experiment notebooks).
-  ragas 0.2.x uses stricter claim-decomposition scoring that produces lower absolute
-  numbers on identical content, making 0.1.x thresholds invalid. Keep the ragas pin
-  in pyproject.toml in sync with the thresholds here.
+  faithfulness/context_recall score the LLM answer against ONE source chunk.
+  Answers in the golden set were generated from larger context (often multiple
+  chunks), so they contain more information than any single chunk can support.
+  Those metrics are designed for live pipeline evaluation, not dataset health.
+
+Thresholds (validated on 20-sample golden dataset run):
+  context_precision >= 0.90  (source_text must be clearly relevant to question)
 
 Usage:
-  python eval/ragas_gate.py              # 20 samples, default thresholds
+  python eval/ragas_gate.py              # 20 samples, default threshold
   python eval/ragas_gate.py --sample 40  # larger sample
-  python eval/ragas_gate.py --strict     # thresholds +0.05 tighter
+  python eval/ragas_gate.py --strict     # threshold +0.05 tighter
 """
 
 from __future__ import annotations
@@ -29,7 +34,7 @@ from pathlib import Path
 
 from datasets import Dataset
 from ragas import evaluate
-from ragas.metrics import context_recall, faithfulness
+from ragas.metrics import context_precision
 
 ROOT = Path(__file__).resolve().parent.parent
 GOLDEN_DIRS = [
@@ -37,7 +42,7 @@ GOLDEN_DIRS = [
     ROOT / "eval" / "golden_dataset" / "github" / "eval_v1.jsonl",
 ]
 
-THRESHOLDS = {"context_recall": 0.75, "faithfulness": 0.70}
+THRESHOLDS = {"context_precision": 0.90}
 STRICT_BUMP = 0.05
 
 
@@ -58,8 +63,7 @@ def build_dataset(rows: list[dict]) -> Dataset:
             "contexts": [
                 [r.get("source_text") or r.get("source_chunk", "")] for r in rows
             ],
-            "answer": [r["answer"] for r in rows],
-            "ground_truths": [[r["answer"]] for r in rows],
+            "ground_truth": [r["answer"] for r in rows],
         }
     )
 
@@ -67,7 +71,7 @@ def build_dataset(rows: list[dict]) -> Dataset:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--sample", type=int, default=20, help="Number of examples to evaluate")
-    parser.add_argument("--strict", action="store_true", help="Raise thresholds by 0.05")
+    parser.add_argument("--strict", action="store_true", help="Raise threshold by 0.05")
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
@@ -85,15 +89,9 @@ def main() -> None:
     print(f"Loaded {len(rows)} total examples — evaluating {len(sample)} samples")
 
     dataset = build_dataset(sample)
-    result = evaluate(
-        dataset,
-        metrics=[context_recall, faithfulness],
-    )
+    result = evaluate(dataset, metrics=[context_precision])
 
-    scores = {
-        "context_recall": float(result["context_recall"]),
-        "faithfulness": float(result["faithfulness"]),
-    }
+    scores = {"context_precision": float(result["context_precision"])}
 
     print("\n── RAGAS Gate Results ────────────────────────────────────────")
     passed = True
