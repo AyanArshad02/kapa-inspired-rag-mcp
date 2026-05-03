@@ -75,10 +75,12 @@ class QueryPipeline:
     ) -> QueryResult:
         """Run the full pipeline and return a complete (non-streamed) answer."""
         cache_key = _cache_key(query, tenant_id)
-        cached = await self._cache.get(cache_key)
-        if cached:
+        cached_result = await self._cache.get(cache_key)
+        if cached_result:
             logger.info("cache_hit tenant=%s", tenant_id)
-            return cached
+            stub = ContextWindow(query=query, tenant_id=tenant_id, chunks=cached_result.source_chunks)
+            asyncio.create_task(self._run_observers(stub, cached_result))
+            return cached_result
 
         try:
             context = await self._build_context(query, tenant_id, conversation_id)
@@ -109,10 +111,12 @@ class QueryPipeline:
     ) -> AsyncIterator[str]:
         """Stream answer tokens as they arrive. Used for SSE responses."""
         cache_key = _cache_key(query, tenant_id)
-        cached = await self._cache.get(cache_key)
-        if cached:
+        cached_result = await self._cache.get(cache_key)
+        if cached_result:
             logger.info("cache_hit tenant=%s", tenant_id)
-            yield cached.answer
+            stub = ContextWindow(query=query, tenant_id=tenant_id, chunks=cached_result.source_chunks)
+            asyncio.create_task(self._run_observers(stub, cached_result))
+            yield cached_result.answer
             return
 
         try:
