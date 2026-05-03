@@ -3,9 +3,15 @@
 Uses source_text as the retrieved context and the stored answer as the response.
 This is a dataset health check — if someone edits the golden set incorrectly, this fails.
 
-Thresholds (set from experiment notebooks 04_ragas_baseline):
+Thresholds (calibrated from experiment notebooks 04_ragas_baseline, RAGAS 0.1.x):
   context_recall  >= 0.75  (ground truth info covered by source_text)
   faithfulness    >= 0.70  (stored answer is faithful to source_text)
+
+IMPORTANT — version pinning:
+  This gate uses ragas>=0.1.14,<0.2.0 (same version as the experiment notebooks).
+  ragas 0.2.x uses stricter claim-decomposition scoring that produces lower absolute
+  numbers on identical content, making 0.1.x thresholds invalid. Keep the ragas pin
+  in pyproject.toml in sync with the thresholds here.
 
 Usage:
   python eval/ragas_gate.py              # 20 samples, default thresholds
@@ -21,10 +27,9 @@ import random
 import sys
 from pathlib import Path
 
-from langchain_openai import ChatOpenAI
-from ragas import EvaluationDataset, SingleTurnSample, evaluate
-from ragas.llms import LangchainLLMWrapper
-from ragas.metrics import ContextRecall, Faithfulness
+from datasets import Dataset
+from ragas import evaluate
+from ragas.metrics import context_recall, faithfulness
 
 ROOT = Path(__file__).resolve().parent.parent
 GOLDEN_DIRS = [
@@ -46,18 +51,17 @@ def load_golden(paths: list[Path]) -> list[dict]:
     return rows
 
 
-def build_dataset(rows: list[dict]) -> EvaluationDataset:
-    samples = []
-    for r in rows:
-        samples.append(
-            SingleTurnSample(
-                user_input=r["question"],
-                retrieved_contexts=[r.get("source_text") or r.get("source_chunk", "")],
-                response=r["answer"],
-                reference=r["answer"],
-            )
-        )
-    return EvaluationDataset(samples=samples)
+def build_dataset(rows: list[dict]) -> Dataset:
+    return Dataset.from_dict(
+        {
+            "question": [r["question"] for r in rows],
+            "contexts": [
+                [r.get("source_text") or r.get("source_chunk", "")] for r in rows
+            ],
+            "answer": [r["answer"] for r in rows],
+            "ground_truths": [[r["answer"]] for r in rows],
+        }
+    )
 
 
 def main() -> None:
@@ -80,24 +84,15 @@ def main() -> None:
     sample = random.sample(rows, min(args.sample, len(rows)))
     print(f"Loaded {len(rows)} total examples — evaluating {len(sample)} samples")
 
-    evaluator_llm = LangchainLLMWrapper(ChatOpenAI(model="gpt-4o-mini"))
     dataset = build_dataset(sample)
     result = evaluate(
-        dataset=dataset,
-        metrics=[ContextRecall(llm=evaluator_llm), Faithfulness(llm=evaluator_llm)],
-        show_progress=True,
+        dataset,
+        metrics=[context_recall, faithfulness],
     )
 
-    def _to_score(value: object) -> float:
-        """Handle both scalar (0.2.15+) and list (older 0.2.x) result formats."""
-        if isinstance(value, (int, float)):
-            return float(value)
-        valid = [v for v in value if v is not None]  # type: ignore[union-attr]
-        return sum(valid) / len(valid) if valid else 0.0
-
     scores = {
-        "context_recall": _to_score(result["context_recall"]),
-        "faithfulness": _to_score(result["faithfulness"]),
+        "context_recall": float(result["context_recall"]),
+        "faithfulness": float(result["faithfulness"]),
     }
 
     print("\n── RAGAS Gate Results ────────────────────────────────────────")
