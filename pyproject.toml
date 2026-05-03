@@ -1,0 +1,118 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kapa-inspired-rag-mcp"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    # API framework
+    "fastapi>=0.111.0",
+    "uvicorn[standard]>=0.29.0",
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.3.0",
+
+    # LLM + embeddings
+    "openai>=1.30.0",
+    "cohere>=5.5.0",
+    "tiktoken>=0.7.0",
+
+    # Vector DB
+    "qdrant-client>=1.9.0",
+
+    # Queue
+    "celery[redis]>=5.4.0",
+    "redis>=5.0.0",
+
+    # Database
+    "asyncpg>=0.29.0",
+    "sqlalchemy[asyncio]>=2.0.30",
+
+    # Document processing
+    "beautifulsoup4>=4.12.0",
+    "httpx>=0.27.0",
+    "pymupdf>=1.24.0",
+    "pymupdf4llm>=0.0.17",
+    "pdfplumber>=0.11.0",
+
+    # Object storage
+    "boto3>=1.34.0",
+
+    # MCP server
+    "mcp>=1.0.0",
+
+    # Observability
+    "langsmith>=0.1.77",
+    "prometheus-client>=0.20.0",
+    "watchtower>=3.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=5.0.0",
+    "ragas>=0.1.14,<0.2.0",
+    "datasets>=2.19.0",
+    "ruff>=0.4.0",
+    "mypy>=1.10.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["backend*", "eval*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# Long string literals in prompts and test fixtures cannot be broken
+"backend/strategies/llm/openai_llm.py" = ["E501"]
+"tests/unit/test_chunkers.py" = ["E501"]
+"tests/unit/test_github_connector.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = false
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "integration: requires docker-compose services (postgres + qdrant)",
+]
+
+[tool.coverage.run]
+omit = [
+    # FastAPI route handlers — covered by integration tests, not unit tests
+    "backend/api/*",
+    # Logging infrastructure — no business logic
+    "backend/logging/*",
+    # App entry points
+    "backend/main.py",
+    "backend/mcp/server.py",
+    # Observers that require live services (Redis, LangSmith, Prometheus push)
+    "backend/observers/cache_observer.py",
+    "backend/observers/metrics_observer.py",
+    "backend/observers/trace_observer.py",
+    # PostgreSQL repositories — covered by integration tests
+    "backend/repositories/postgres_ingestion_job_repo.py",
+    "backend/repositories/postgres_source_hash_repo.py",
+    "backend/repositories/postgres_tenant_repo.py",
+    "backend/repositories/postgres_webhook_secret_repo.py",
+    # Queue / Celery — requires Redis broker
+    "backend/strategies/queue/*",
+    # Qdrant strategy — requires running Qdrant
+    "backend/strategies/vectordb/qdrant_db.py",
+    # Celery task entry points — integration layer
+    "backend/tasks/*",
+    # Docs connector — requires network
+    "backend/connectors/docs_connector.py",
+    # Ingestion pipeline — covered by integration tests
+    "backend/core/ingestion_pipeline.py",
+]

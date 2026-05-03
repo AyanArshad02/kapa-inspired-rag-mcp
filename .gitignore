@@ -1,3 +1,6 @@
+logs/
+eval/embed_cache/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -50,6 +53,15 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+
+#Skill files
+kapa-rag-mcp-skill
+
+# personal notes
+notes.txt
+content.md
+LEARNINGS.md
+INTERVIEW.md
 
 # Translations
 *.mo
