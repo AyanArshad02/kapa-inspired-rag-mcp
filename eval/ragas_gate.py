@@ -16,8 +16,9 @@ WHY context_precision and NOT faithfulness/context_recall:
   Those metrics are designed for live pipeline evaluation, not dataset health.
 
 Thresholds (validated on 20-sample golden dataset run):
-  context_precision >= 0.75  (observed baseline on clean data is ~0.80; 0.75 leaves
-                               buffer to catch corruption without false-failing good data)
+  context_precision >= 0.70  (observed scores: 0.800 and 0.750 across two runs; 0.70
+                               leaves buffer for LLM non-determinism and sampling variance
+                               while still catching dataset corruption, which drops to ~0)
 
 Usage:
   python eval/ragas_gate.py              # 20 samples, default threshold
@@ -43,7 +44,7 @@ GOLDEN_DIRS = [
     ROOT / "eval" / "golden_dataset" / "github" / "eval_v1.jsonl",
 ]
 
-THRESHOLDS = {"context_precision": 0.75}
+THRESHOLDS = {"context_precision": 0.70}
 STRICT_BUMP = 0.05
 
 
