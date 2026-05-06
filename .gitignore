@@ -64,6 +64,8 @@ LEARNINGS.md
 INTERVIEW.md
 OBSERVABILITY.md
 SOFTWARE_ENGINEERING.md
+blogs/
+.claude/
 
 # Translations
 *.mo
