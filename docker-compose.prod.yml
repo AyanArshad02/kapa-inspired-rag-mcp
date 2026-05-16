@@ -210,6 +210,21 @@ services:
     networks:
       - kapa_net
 
+  streamlit:
+    image: ${ECR_REGISTRY}/kapa-streamlit:${IMAGE_TAG:-latest}
+    container_name: kapa_streamlit
+    ports:
+      - "8501:8501"
+    environment:
+      - INGESTION_URL=http://ingestion-service:8001
+      - QUERY_URL=http://query-service:8000
+    depends_on:
+      query-service:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - kapa_net
+
   # mcp-server omitted from prod — stdio transport only, designed for local
   # Claude Desktop / Claude Code use, not a public HTTP endpoint.
 

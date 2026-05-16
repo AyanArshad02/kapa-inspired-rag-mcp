@@ -99,6 +99,18 @@ jobs:
           cache-from: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/kapa-mcp:cache
           cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/kapa-mcp:cache,mode=max
 
+      - name: Build and push — Streamlit frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: streamlit
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/kapa-streamlit:${{ steps.meta.outputs.tag }}
+            ${{ steps.login-ecr.outputs.registry }}/kapa-streamlit:latest
+          cache-from: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/kapa-streamlit:cache
+          cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/kapa-streamlit:cache,mode=max
+
   deploy:
     name: Deploy to EC2
     runs-on: ubuntu-latest

@@ -6,11 +6,13 @@ Main:     chat interface with source citations and conversation memory
 """
 from __future__ import annotations
 
+import os
+
 import requests
 import streamlit as st
 
-INGESTION_URL = "http://localhost:8001"
-QUERY_URL = "http://localhost:8000"
+INGESTION_URL = os.getenv("INGESTION_URL", "http://localhost:8001")
+QUERY_URL = os.getenv("QUERY_URL", "http://localhost:8000")
 
 st.set_page_config(
     page_title="Kapa RAG Demo",
