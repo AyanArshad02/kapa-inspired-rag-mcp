@@ -210,22 +210,8 @@ services:
     networks:
       - kapa_net
 
-  mcp-server:
-    image: ${ECR_REGISTRY}/kapa-mcp:${IMAGE_TAG:-latest}
-    container_name: kapa_mcp
-    ports:
-      - "8002:8002"
-    environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - COHERE_API_KEY=${COHERE_API_KEY}
-      - QUERY_SERVICE_URL=http://query-service:8000
-      - SERVICE_PORT=8002
-    depends_on:
-      query-service:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - kapa_net
+  # mcp-server omitted from prod — stdio transport only, designed for local
+  # Claude Desktop / Claude Code use, not a public HTTP endpoint.
 
   # ── Observability Layer ──────────────────────────────────────────────────────
   # Prometheus + Grafana omitted on t3.small (2GB RAM) to stay within memory budget.
