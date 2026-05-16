@@ -72,7 +72,7 @@ services:
     image: ${ECR_REGISTRY}/kapa-ingestion:${IMAGE_TAG:-latest}
     container_name: kapa_ingestion
     ports:
-      - "8001:8001"
+      - "9001:8001"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - COHERE_API_KEY=${COHERE_API_KEY}
@@ -132,7 +132,7 @@ services:
   celery-worker:
     image: ${ECR_REGISTRY}/kapa-celery:${IMAGE_TAG:-latest}
     container_name: kapa_celery
-    command: celery -A backend.strategies.queue.celery_redis_queue worker --loglevel=info --concurrency=4
+    command: celery -A backend.strategies.queue.celery_redis_queue worker --loglevel=info --concurrency=1
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - COHERE_API_KEY=${COHERE_API_KEY}
@@ -162,6 +162,8 @@ services:
     container_name: kapa_celery_beat
     command: celery -A backend.strategies.queue.celery_redis_queue beat --loglevel=info
     environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - COHERE_API_KEY=${COHERE_API_KEY}
       - REDIS_URL=redis://redis:6379
       - POSTGRES_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kapa_rag}
     depends_on:
@@ -175,7 +177,7 @@ services:
     image: ${ECR_REGISTRY}/kapa-query:${IMAGE_TAG:-latest}
     container_name: kapa_query
     ports:
-      - "8000:8000"
+      - "9000:8000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - COHERE_API_KEY=${COHERE_API_KEY}
@@ -214,6 +216,8 @@ services:
     ports:
       - "8002:8002"
     environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - COHERE_API_KEY=${COHERE_API_KEY}
       - QUERY_SERVICE_URL=http://query-service:8000
       - SERVICE_PORT=8002
     depends_on:
@@ -224,37 +228,8 @@ services:
       - kapa_net
 
   # ── Observability Layer ──────────────────────────────────────────────────────
-
-  prometheus:
-    image: prom/prometheus:v2.48.0
-    container_name: kapa_prometheus
-    volumes:
-      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=30d'
-    # No port binding — access via SSH tunnel: ssh -L 9090:localhost:9090 ec2-user@<host>
-    restart: unless-stopped
-    networks:
-      - kapa_net
-
-  grafana:
-    image: grafana/grafana:10.2.0
-    container_name: kapa_grafana
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
-      - GF_SERVER_ROOT_URL=http://${EC2_HOST:-localhost}:3000
-    volumes:
-      - grafana_data:/var/lib/grafana
-    depends_on:
-      - prometheus
-    restart: unless-stopped
-    networks:
-      - kapa_net
+  # Prometheus + Grafana omitted on t3.small (2GB RAM) to stay within memory budget.
+  # Services still expose /metrics endpoints — add these back when on t3.medium+.
 
 networks:
   kapa_net:
@@ -264,5 +239,3 @@ volumes:
   postgres_data:
   redis_data:
   qdrant_data:
-  prometheus_data:
-  grafana_data:
