@@ -1,9 +1,9 @@
 name: Deploy
 
 on:
-  # Temporarily manual-only until EC2 infrastructure is provisioned.
-  # Switch back to `push: branches: [main]` after EC2 setup is complete.
-  workflow_dispatch:
+  push:
+    branches: [main]
+  workflow_dispatch: # keep manual trigger as fallback
 
 concurrency:
   group: deploy-prod
