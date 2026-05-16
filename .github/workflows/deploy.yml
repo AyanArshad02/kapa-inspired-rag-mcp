@@ -99,6 +99,18 @@ jobs:
           cache-from: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/kapa-mcp:cache
           cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/kapa-mcp:cache,mode=max
 
+      - name: Build and push — auth service
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: auth
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/kapa-auth:${{ steps.meta.outputs.tag }}
+            ${{ steps.login-ecr.outputs.registry }}/kapa-auth:latest
+          cache-from: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/kapa-auth:cache
+          cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/kapa-auth:cache,mode=max
+
       - name: Build and push — Streamlit frontend
         uses: docker/build-push-action@v5
         with:

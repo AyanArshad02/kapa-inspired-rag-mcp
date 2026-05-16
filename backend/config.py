@@ -31,6 +31,11 @@ class Settings(BaseSettings):
 
     service_port: int = 8000
 
+    # Auth
+    jwt_secret: str = "change-me-in-production"
+    jwt_access_expire_minutes: int = 15
+    jwt_refresh_expire_days: int = 30
+
     # Observability
     environment: str = "dev"
     cloudwatch_log_group: str = "/kapa-rag/production"

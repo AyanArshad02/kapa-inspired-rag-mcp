@@ -21,6 +21,9 @@ CMD ["uvicorn", "backend.api.webhook:app", "--host", "0.0.0.0", "--port", "8003"
 FROM base AS celery
 # CMD is set per-container in docker-compose.yml
 
+FROM base AS auth
+CMD ["uvicorn", "backend.api.auth_service:app", "--host", "0.0.0.0", "--port", "8004"]
+
 FROM python:3.11-slim AS streamlit
 WORKDIR /app
 COPY frontend/requirements.txt ./

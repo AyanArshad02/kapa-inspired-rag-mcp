@@ -210,6 +210,28 @@ services:
     networks:
       - kapa_net
 
+  auth-service:
+    image: ${ECR_REGISTRY}/kapa-auth:${IMAGE_TAG:-latest}
+    container_name: kapa_auth
+    ports:
+      - "8004:8004"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - POSTGRES_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kapa_rag}
+      - JWT_SECRET=${JWT_SECRET}
+      - SERVICE_PORT=8004
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8004/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - kapa_net
+
   streamlit:
     image: ${ECR_REGISTRY}/kapa-streamlit:${IMAGE_TAG:-latest}
     container_name: kapa_streamlit

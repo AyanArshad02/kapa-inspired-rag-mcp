@@ -60,6 +60,30 @@ CREATE TABLE IF NOT EXISTS source_hashes (
 
 CREATE INDEX IF NOT EXISTS idx_source_hashes_tenant ON source_hashes (tenant_id);
 
+-- users: one row per signup. Stores email/password and the raw API key so
+-- it can be embedded in a JWT on login without requiring the user to copy it.
+CREATE TABLE IF NOT EXISTS users (
+    user_id       UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id     UUID        NOT NULL REFERENCES tenants(tenant_id),
+    email         VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    api_key       TEXT        NOT NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
+
+-- refresh_tokens: one row per active session. Token is stored as SHA-256 hash.
+-- On each refresh the old token is deleted and a new one is issued (rotation).
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+    token_hash  TEXT        PRIMARY KEY,
+    user_id     UUID        NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    expires_at  TIMESTAMPTZ NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens (user_id);
+
 -- webhook_secrets: per-tenant HMAC secret for verifying GitHub push events.
 CREATE TABLE IF NOT EXISTS webhook_secrets (
     tenant_id  TEXT        NOT NULL PRIMARY KEY,
