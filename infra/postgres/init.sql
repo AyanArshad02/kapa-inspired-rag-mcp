@@ -45,3 +45,25 @@ CREATE INDEX IF NOT EXISTS idx_jobs_tenant_id  ON ingestion_jobs(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_status     ON ingestion_jobs(status);
 CREATE INDEX IF NOT EXISTS idx_turns_conversation ON conversation_turns(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_turns_created   ON conversation_turns(created_at DESC);
+
+-- source_hashes: last-seen content hash per (tenant_id, source_url).
+-- Used by FreshnessManager to detect stale sources without re-fetching content.
+CREATE TABLE IF NOT EXISTS source_hashes (
+    tenant_id    TEXT        NOT NULL,
+    source_url   TEXT        NOT NULL,
+    source_type  TEXT        NOT NULL DEFAULT 'unknown',
+    content_hash TEXT        NOT NULL,
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    PRIMARY KEY (tenant_id, source_url)
+);
+
+CREATE INDEX IF NOT EXISTS idx_source_hashes_tenant ON source_hashes (tenant_id);
+
+-- webhook_secrets: per-tenant HMAC secret for verifying GitHub push events.
+CREATE TABLE IF NOT EXISTS webhook_secrets (
+    tenant_id  TEXT        NOT NULL PRIMARY KEY,
+    secret     TEXT        NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

@@ -62,6 +62,12 @@ notes.txt
 content.md
 LEARNINGS.md
 INTERVIEW.md
+OBSERVABILITY_MONITORING.md
+PROMETHEUS_GRAFANA.md
+SOFTWARE_ENGINEERING.md
+blogs/
+.claude/
+ARCHITECTURE.md
 
 # Translations
 *.mo

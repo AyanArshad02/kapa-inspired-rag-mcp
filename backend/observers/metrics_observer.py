@@ -32,5 +32,6 @@ class MetricsObserver(QueryObserver):
             tenant_id=context.tenant_id,
             cached=str(result.cached),
         ).inc()
-        _query_tokens.observe(context.total_tokens)
-        _source_chunks.observe(len(result.source_chunks))
+        if not result.cached:
+            _query_tokens.observe(context.total_tokens)
+            _source_chunks.observe(len(result.source_chunks))

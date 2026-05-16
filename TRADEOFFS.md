@@ -116,6 +116,35 @@ Will be decided empirically in Phase 2. Candidates: gpt-4o, gpt-4o-mini. Plan is
 
 ---
 
+## 9. CI Eval Gate Metric Choice
+
+**Decision: `context_precision` only in the PR gate; full 4-metric eval in the staging gate**
+
+The PR gate (`ragas_gate.py`) is a **dataset health check**, not a pipeline quality check.
+Its one job: detect if the golden dataset has been corrupted.
+
+`context_precision` asks: "Is `source_text` relevant to `question`?" Clean data → ~0.75–0.80.
+Corrupted `source_text` → ~0.0–0.10. Threshold set at 0.70 — wide enough gap to separate
+both cases even with LLM non-determinism and random sampling variance (~±0.05 per run).
+
+**Why not `faithfulness` or `context_recall`?**
+Both metrics compare the stored answer against one `source_text` chunk. Answers were
+generated in notebooks from 5 retrieved chunks — they contain information no single chunk
+can support. Both score ~0.5 on perfectly clean data. Using them would produce constant
+false failures with no diagnostic signal.
+
+**The tradeoff**: `context_precision` catches source_text and question corruption, but does
+NOT catch answer corruption (if someone replaces an answer with garbage). `answer_relevancy`
+would catch that, but it's more expensive and the golden dataset answers are human-reviewed.
+Accepted gap: answer corruption is unlikely and visually reviewable in PRs.
+
+**Pipeline regressions** (retrieval score drops, reranker degradation) belong in the
+**staging gate**, not the PR gate. The staging gate runs all 4 RAGAS metrics against the
+live pipeline after deploy to staging, before prod. Cost: ~$0.20–0.50 per main merge vs
+$0.03 per PR — 10× higher but only runs once per release, not once per commit.
+
+---
+
 ## 9. Future Source Types (not yet experimented)
 
 | Source          | Planned Chunker       | Rationale                                         |

@@ -63,9 +63,8 @@ services:
     container_name: kapa_ingestion
     ports:
       - "8001:8001"
+    env_file: .env
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - COHERE_API_KEY=${COHERE_API_KEY}
       - QDRANT_URL=http://qdrant:6333
       - REDIS_URL=redis://redis:6379
       - POSTGRES_URL=postgresql://kapa:kapa_dev_password@postgres:5432/kapa_rag
@@ -94,9 +93,8 @@ services:
       target: celery
     container_name: kapa_celery
     command: celery -A backend.strategies.queue.celery_redis_queue worker --loglevel=info --concurrency=4
+    env_file: .env
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - COHERE_API_KEY=${COHERE_API_KEY}
       - QDRANT_URL=http://qdrant:6333
       - REDIS_URL=redis://redis:6379
       - POSTGRES_URL=postgresql://kapa:kapa_dev_password@postgres:5432/kapa_rag
@@ -118,6 +116,7 @@ services:
       target: celery
     container_name: kapa_celery_beat
     command: celery -A backend.strategies.queue.celery_redis_queue beat --loglevel=info
+    env_file: .env
     environment:
       - REDIS_URL=redis://redis:6379
       - POSTGRES_URL=postgresql://kapa:kapa_dev_password@postgres:5432/kapa_rag
@@ -134,13 +133,11 @@ services:
     container_name: kapa_query
     ports:
       - "8000:8000"
+    env_file: .env
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - COHERE_API_KEY=${COHERE_API_KEY}
       - QDRANT_URL=http://qdrant:6333
       - REDIS_URL=redis://redis:6379
       - POSTGRES_URL=postgresql://kapa:kapa_dev_password@postgres:5432/kapa_rag
-      - LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
       - SERVICE_PORT=8000
     depends_on:
       postgres:
@@ -172,6 +169,7 @@ services:
     container_name: kapa_mcp
     ports:
       - "8002:8002"
+    env_file: .env
     environment:
       - QUERY_SERVICE_URL=http://query-service:8000
       - SERVICE_PORT=8002
