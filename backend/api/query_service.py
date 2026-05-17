@@ -29,9 +29,17 @@ from backend.strategies.vectordb.qdrant_db import QdrantDB
 logger = logging.getLogger(__name__)
 app = FastAPI(title="kapa-rag query service")
 
+import os as _os
+
+_ALLOWED_ORIGINS = [
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+    *[o.strip() for o in _os.getenv("EXTRA_ALLOWED_ORIGINS", "").split(",") if o.strip()],
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3001", "http://127.0.0.1:3001"],
+    allow_origins=_ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

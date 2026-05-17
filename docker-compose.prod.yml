@@ -74,6 +74,7 @@ services:
     ports:
       - "9001:8001"
     environment:
+      - EXTRA_ALLOWED_ORIGINS=${EXTRA_ALLOWED_ORIGINS:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - COHERE_API_KEY=${COHERE_API_KEY}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
@@ -179,6 +180,7 @@ services:
     ports:
       - "9000:8000"
     environment:
+      - EXTRA_ALLOWED_ORIGINS=${EXTRA_ALLOWED_ORIGINS:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - COHERE_API_KEY=${COHERE_API_KEY}
       - QDRANT_URL=http://qdrant:6333
@@ -220,6 +222,7 @@ services:
       - POSTGRES_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kapa_rag}
       - JWT_SECRET=${JWT_SECRET}
       - SERVICE_PORT=8004
+      - EXTRA_ALLOWED_ORIGINS=${EXTRA_ALLOWED_ORIGINS:-}
     depends_on:
       postgres:
         condition: service_healthy

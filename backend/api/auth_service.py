@@ -15,11 +15,13 @@ from backend.config import settings
 
 app = FastAPI(title="kapa-rag auth service")
 
+import os as _os
+
 _ALLOWED_ORIGINS = [
     "http://localhost:3001",
     "http://127.0.0.1:3001",
     "http://localhost:3000",
-    # EC2 — added automatically when the frontend is deployed
+    *[o.strip() for o in _os.getenv("EXTRA_ALLOWED_ORIGINS", "").split(",") if o.strip()],
 ]
 
 app.add_middleware(
