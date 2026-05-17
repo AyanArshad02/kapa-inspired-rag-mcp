@@ -5,6 +5,7 @@ eval/embed_cache/
 frontend-next/node_modules/
 frontend-next/.next/
 frontend-next/.env.local
+!frontend-next/lib/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
