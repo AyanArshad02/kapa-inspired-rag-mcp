@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 
 import asyncpg
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel
@@ -27,6 +28,14 @@ from backend.strategies.vectordb.qdrant_db import QdrantDB
 
 logger = logging.getLogger(__name__)
 app = FastAPI(title="kapa-rag query service")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3001", "http://127.0.0.1:3001"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/metrics", include_in_schema=False)

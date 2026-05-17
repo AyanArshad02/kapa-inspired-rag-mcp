@@ -123,6 +123,22 @@ jobs:
           cache-from: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/kapa-streamlit:cache
           cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/kapa-streamlit:cache,mode=max
 
+      - name: Build and push — Next.js frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: nextjs
+          push: true
+          build-args: |
+            NEXT_PUBLIC_AUTH_URL=http://${{ secrets.EC2_HOST }}:8004
+            NEXT_PUBLIC_INGESTION_URL=http://${{ secrets.EC2_HOST }}:9001
+            NEXT_PUBLIC_QUERY_URL=http://${{ secrets.EC2_HOST }}:9000
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/kapa-frontend:${{ steps.meta.outputs.tag }}
+            ${{ steps.login-ecr.outputs.registry }}/kapa-frontend:latest
+          cache-from: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/kapa-frontend:cache
+          cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/kapa-frontend:cache,mode=max
+
   deploy:
     name: Deploy to EC2
     runs-on: ubuntu-latest

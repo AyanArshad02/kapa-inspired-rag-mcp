@@ -1,6 +1,11 @@
 logs/
 eval/embed_cache/
 
+# Next.js
+frontend-next/node_modules/
+frontend-next/.next/
+frontend-next/.env.local
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -65,6 +70,10 @@ INTERVIEW.md
 OBSERVABILITY_MONITORING.md
 PROMETHEUS_GRAFANA.md
 SOFTWARE_ENGINEERING.md
+AUTH_NOTES.md
+DEPLOYMENT_NOTES.md
+MCP_NOTES.md
+
 blogs/
 .claude/
 ARCHITECTURE.md

@@ -247,6 +247,15 @@ services:
     networks:
       - kapa_net
 
+  frontend:
+    image: ${ECR_REGISTRY}/kapa-frontend:${IMAGE_TAG:-latest}
+    container_name: kapa_frontend
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
+    networks:
+      - kapa_net
+
   # mcp-server omitted from prod — stdio transport only, designed for local
   # Claude Desktop / Claude Code use, not a public HTTP endpoint.
 

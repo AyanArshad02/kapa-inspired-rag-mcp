@@ -6,6 +6,7 @@ from uuid import UUID
 
 import asyncpg
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel, HttpUrl
 from starlette.responses import Response as _PrometheusResponse
@@ -20,6 +21,14 @@ from backend.strategies.storage.s3_storage import S3Storage
 
 logger = logging.getLogger(__name__)
 app = FastAPI(title="kapa-rag ingestion service")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3001", "http://127.0.0.1:3001"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/metrics", include_in_schema=False)

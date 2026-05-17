@@ -223,6 +223,16 @@ services:
       - prometheus
     restart: unless-stopped
 
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: nextjs
+    container_name: kapa_frontend
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:
