@@ -75,6 +75,7 @@ services:
       - "9001:8001"
     environment:
       - EXTRA_ALLOWED_ORIGINS=${EXTRA_ALLOWED_ORIGINS:-}
+      - JWT_SECRET=${JWT_SECRET}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - COHERE_API_KEY=${COHERE_API_KEY}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
@@ -181,6 +182,7 @@ services:
       - "9000:8000"
     environment:
       - EXTRA_ALLOWED_ORIGINS=${EXTRA_ALLOWED_ORIGINS:-}
+      - JWT_SECRET=${JWT_SECRET}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - COHERE_API_KEY=${COHERE_API_KEY}
       - QDRANT_URL=http://qdrant:6333
