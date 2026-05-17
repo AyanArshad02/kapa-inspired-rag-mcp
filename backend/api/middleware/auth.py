@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import hashlib
-
 from fastapi import HTTPException, Request, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
@@ -25,10 +23,10 @@ async def get_tenant_id(
     credentials: HTTPAuthorizationCredentials = Security(_bearer),
 ) -> str:
     api_key = _extract_api_key(credentials.credentials)
-    key_hash = hashlib.sha256(api_key.encode()).hexdigest()
 
     repo = request.app.state.tenant_repo
-    tenant_id = await repo.get_tenant_id_by_api_key(key_hash)
+    # repo.get_tenant_id_by_api_key hashes internally — pass the raw key
+    tenant_id = await repo.get_tenant_id_by_api_key(api_key)
     if tenant_id is None:
         raise HTTPException(status_code=401, detail="Invalid API key")
 

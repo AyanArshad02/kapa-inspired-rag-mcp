@@ -81,6 +81,52 @@ class PostgresConversationRepository(ConversationRepository):
                 str(conversation_id),
             )
 
+    async def list_conversations(self, tenant_id: str) -> list[dict]:
+        """Return one summary row per conversation, most recent first."""
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT
+                    conversation_id,
+                    MAX(created_at)  AS last_active,
+                    COUNT(*)         AS message_count,
+                    (
+                        SELECT content FROM conversation_turns inner_ct
+                        WHERE  inner_ct.conversation_id = outer_ct.conversation_id
+                          AND  inner_ct.role = 'user'
+                        ORDER  BY created_at ASC LIMIT 1
+                    ) AS first_message
+                FROM   conversation_turns outer_ct
+                WHERE  tenant_id = $1
+                GROUP  BY conversation_id
+                ORDER  BY MAX(created_at) DESC
+                """,
+                tenant_id,
+            )
+        return [
+            {
+                "conversation_id": str(r["conversation_id"]),
+                "last_active": r["last_active"].isoformat(),
+                "message_count": r["message_count"],
+                "preview": (r["first_message"] or "")[:80],
+            }
+            for r in rows
+        ]
+
+    async def get_messages(self, conversation_id: UUID, tenant_id: str) -> list[dict]:
+        """Return all messages for a conversation as [{role, content}], oldest first."""
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT role, content FROM conversation_turns
+                WHERE  conversation_id = $1 AND tenant_id = $2
+                ORDER  BY created_at ASC
+                """,
+                str(conversation_id),
+                tenant_id,
+            )
+        return [{"role": r["role"], "content": r["content"]} for r in rows]
+
 
 def _pair_rows(rows: list, conversation_id: UUID) -> list[Turn]:
     """Group consecutive user+assistant rows into Turn objects."""

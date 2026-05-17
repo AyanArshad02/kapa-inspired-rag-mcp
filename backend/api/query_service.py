@@ -133,6 +133,25 @@ async def delete_conversation(
     return {"deleted": str(conversation_id)}
 
 
+@app.get("/query/conversations")
+async def list_conversations(
+    tenant_id: str = Depends(get_tenant_id),
+) -> list[dict]:
+    """List all conversations for this tenant, most recent first."""
+    pipeline: QueryPipeline = app.state.pipeline
+    return await pipeline._conversation_repo.list_conversations(tenant_id)
+
+
+@app.get("/query/conversations/{conversation_id}/messages")
+async def get_conversation_messages(
+    conversation_id: UUID,
+    tenant_id: str = Depends(get_tenant_id),
+) -> list[dict]:
+    """Return all messages for a conversation as [{role, content}]."""
+    pipeline: QueryPipeline = app.state.pipeline
+    return await pipeline._conversation_repo.get_messages(conversation_id, tenant_id)
+
+
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok"}

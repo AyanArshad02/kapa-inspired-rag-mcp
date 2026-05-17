@@ -1,40 +1,51 @@
 'use client'
 
-import { type FormEvent, useEffect, useRef, useState } from 'react'
+import { type FormEvent, useEffect, useRef } from 'react'
+import ReactMarkdown from 'react-markdown'
 import { queryApi } from '@/lib/api'
 
-interface Message {
+export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   sources?: string[]
   cached?: boolean
 }
 
-export default function ChatInterface() {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [convId, setConvId] = useState<string | null>(null)
+interface Props {
+  messages: ChatMessage[]
+  conversationId: string | null
+  onMessagesChange: (msgs: ChatMessage[]) => void
+  onConversationChange: (id: string) => void
+}
+
+export default function ChatInterface({
+  messages,
+  conversationId,
+  onMessagesChange,
+  onConversationChange,
+}: Props) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, loading])
+  }, [messages])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    const q = input.trim()
-    if (!q || loading) return
+    const form = e.currentTarget as HTMLFormElement
+    const input = (form.elements.namedItem('q') as HTMLInputElement)
+    const q = input.value.trim()
+    if (!q) return
+    input.value = ''
 
-    setInput('')
-    setMessages((prev) => [...prev, { role: 'user', content: q }])
-    setLoading(true)
+    const optimistic: ChatMessage[] = [...messages, { role: 'user', content: q }]
+    onMessagesChange([...optimistic, { role: 'assistant', content: '__loading__' }])
 
     try {
-      const result = await queryApi(q, convId)
-      setConvId(result.conversation_id)
-      setMessages((prev) => [
-        ...prev,
+      const result = await queryApi(q, conversationId)
+      onConversationChange(result.conversation_id)
+      onMessagesChange([
+        ...optimistic,
         {
           role: 'assistant',
           content: result.answer,
@@ -43,36 +54,23 @@ export default function ChatInterface() {
         },
       ])
     } catch (err: unknown) {
-      setMessages((prev) => [
-        ...prev,
+      onMessagesChange([
+        ...optimistic,
         {
           role: 'assistant',
           content: err instanceof Error ? err.message : 'Something went wrong. Please try again.',
         },
       ])
-    } finally {
-      setLoading(false)
     }
   }
 
-  function newChat() {
-    setMessages([])
-    setConvId(null)
-  }
+  const isLoading = messages.at(-1)?.content === '__loading__'
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
       {/* Chat header */}
       <div className="px-6 py-3 border-b border-gray-200 bg-white flex items-center justify-between">
         <h2 className="text-sm font-semibold text-gray-700">Chat with your Docs</h2>
-        {messages.length > 0 && (
-          <button
-            onClick={newChat}
-            className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 px-3 py-1 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            New chat
-          </button>
-        )}
       </div>
 
       {/* Messages */}
@@ -85,66 +83,60 @@ export default function ChatInterface() {
           </div>
         )}
 
-        {messages.map((msg, i) => (
-          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div
-              className={`max-w-2xl rounded-2xl px-4 py-3 text-sm shadow-sm ${
-                msg.role === 'user'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white border border-gray-200 text-gray-800'
-              }`}
-            >
-              <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+        {messages.map((msg, i) => {
+          if (msg.content === '__loading__') {
+            return (
+              <div key={i} className="flex justify-start">
+                <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm">
+                  <div className="flex gap-1 items-center h-5">
+                    <span className="w-2 h-2 bg-gray-300 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                    <span className="w-2 h-2 bg-gray-300 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                    <span className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" />
+                  </div>
+                </div>
+              </div>
+            )
+          }
 
-              {msg.sources && msg.sources.length > 0 && (
-                <details className="mt-2">
-                  <summary
-                    className={`text-xs cursor-pointer select-none ${
-                      msg.role === 'user' ? 'text-blue-200' : 'text-gray-400'
-                    }`}
-                  >
-                    📎 {msg.sources.length} source{msg.sources.length !== 1 ? 's' : ''}
-                  </summary>
-                  <ul className="mt-1 space-y-0.5 pl-1">
-                    {msg.sources.map((s, j) => (
-                      <li
-                        key={j}
-                        className={`text-xs truncate ${
-                          msg.role === 'user' ? 'text-blue-200' : 'text-gray-500'
-                        }`}
-                        title={s}
-                      >
-                        {s}
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
+          return (
+            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div
+                className={`max-w-2xl rounded-2xl px-4 py-3 text-sm shadow-sm ${
+                  msg.role === 'user'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white border border-gray-200 text-gray-800'
+                }`}
+              >
+                {msg.role === 'user' ? (
+                  <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                ) : (
+                  <div className="prose prose-sm max-w-none prose-p:my-1 prose-pre:bg-gray-100 prose-pre:text-gray-800 prose-code:text-blue-700 prose-code:bg-blue-50 prose-code:px-1 prose-code:rounded prose-strong:text-gray-900 prose-li:my-0">
+                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  </div>
+                )}
 
-              {msg.cached && (
-                <p
-                  className={`text-xs mt-1.5 ${
-                    msg.role === 'user' ? 'text-blue-200' : 'text-gray-400'
-                  }`}
-                >
-                  ⚡ Cached
-                </p>
-              )}
-            </div>
-          </div>
-        ))}
+                {msg.sources && msg.sources.length > 0 && (
+                  <details className="mt-2">
+                    <summary className="text-xs cursor-pointer select-none text-gray-400">
+                      📎 {msg.sources.length} source{msg.sources.length !== 1 ? 's' : ''}
+                    </summary>
+                    <ul className="mt-1 space-y-0.5 pl-1">
+                      {msg.sources.map((s, j) => (
+                        <li key={j} className="text-xs truncate text-gray-500" title={s}>
+                          {s}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
 
-        {loading && (
-          <div className="flex justify-start">
-            <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm">
-              <div className="flex gap-1 items-center h-5">
-                <span className="w-2 h-2 bg-gray-300 rounded-full animate-bounce [animation-delay:-0.3s]" />
-                <span className="w-2 h-2 bg-gray-300 rounded-full animate-bounce [animation-delay:-0.15s]" />
-                <span className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" />
+                {msg.cached && (
+                  <p className="text-xs mt-1.5 text-gray-400">⚡ Cached</p>
+                )}
               </div>
             </div>
-          </div>
-        )}
+          )
+        })}
 
         <div ref={bottomRef} />
       </div>
@@ -153,15 +145,14 @@ export default function ChatInterface() {
       <div className="px-6 py-4 bg-white border-t border-gray-200">
         <form onSubmit={handleSubmit} className="flex gap-3">
           <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
+            name="q"
             placeholder="Ask a question about your docs…"
-            disabled={loading}
+            disabled={isLoading}
             className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:bg-gray-50"
           />
           <button
             type="submit"
-            disabled={loading || !input.trim()}
+            disabled={isLoading}
             className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Send

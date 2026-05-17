@@ -4,17 +4,45 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/components/AuthContext'
 import AddSourcePanel from '@/components/AddSourcePanel'
-import ChatInterface from '@/components/ChatInterface'
+import ChatInterface, { type ChatMessage } from '@/components/ChatInterface'
 import SourceList from '@/components/SourceList'
+import PreviousChats from '@/components/PreviousChats'
+import { getConversationMessagesApi } from '@/lib/api'
+
+type SidebarTab = 'chats' | 'sources'
 
 export default function DashboardPage() {
   const { user, loading, logout } = useAuth()
   const router = useRouter()
-  const [refreshKey, setRefreshKey] = useState(0)
+  const [tab, setTab] = useState<SidebarTab>('chats')
+  const [sourceRefreshKey, setSourceRefreshKey] = useState(0)
+  const [chatRefreshKey, setChatRefreshKey] = useState(0)
+  const [activeConvId, setActiveConvId] = useState<string | null>(null)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
 
   useEffect(() => {
     if (!loading && !user) router.replace('/login')
   }, [user, loading, router])
+
+  async function handleSelectConversation(convId: string) {
+    try {
+      const msgs = await getConversationMessagesApi(convId)
+      setMessages(msgs.map((m) => ({ role: m.role, content: m.content })))
+      setActiveConvId(convId)
+    } catch {
+      // ignore
+    }
+  }
+
+  function handleNewChat() {
+    setMessages([])
+    setActiveConvId(null)
+  }
+
+  function handleConversationChange(id: string) {
+    setActiveConvId(id)
+    setChatRefreshKey((k) => k + 1)
+  }
 
   if (loading || !user) {
     return (
@@ -46,18 +74,67 @@ export default function DashboardPage() {
       {/* Body */}
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <aside className="w-72 bg-white border-r border-gray-200 flex flex-col overflow-hidden shrink-0">
-          <div className="p-4 border-b border-gray-100 overflow-y-auto">
-            <AddSourcePanel onIngested={() => setRefreshKey((k) => k + 1)} />
+        <aside className="w-64 bg-white border-r border-gray-200 flex flex-col shrink-0">
+          {/* Tab switcher */}
+          <div className="flex border-b border-gray-200 shrink-0">
+            <button
+              onClick={() => setTab('chats')}
+              className={`flex-1 py-3 text-xs font-semibold tracking-wide transition-colors ${
+                tab === 'chats'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              💬 CHATS
+            </button>
+            <button
+              onClick={() => setTab('sources')}
+              className={`flex-1 py-3 text-xs font-semibold tracking-wide transition-colors ${
+                tab === 'sources'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              📚 SOURCES
+            </button>
           </div>
-          <div className="flex-1 overflow-y-auto p-4">
-            <SourceList refreshKey={refreshKey} />
+
+          {/* Tab content */}
+          <div className="flex-1 overflow-y-auto">
+            {tab === 'chats' && (
+              <div className="p-3 space-y-2">
+                <button
+                  onClick={handleNewChat}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+                >
+                  <span className="text-base leading-none">+</span>
+                  New Chat
+                </button>
+                <PreviousChats
+                  activeId={activeConvId}
+                  onSelect={handleSelectConversation}
+                  refreshKey={chatRefreshKey}
+                />
+              </div>
+            )}
+
+            {tab === 'sources' && (
+              <div className="p-3 space-y-4">
+                <AddSourcePanel onIngested={() => { setSourceRefreshKey((k) => k + 1); setTab('sources') }} />
+                <SourceList refreshKey={sourceRefreshKey} />
+              </div>
+            )}
           </div>
         </aside>
 
         {/* Chat */}
         <main className="flex-1 overflow-hidden">
-          <ChatInterface />
+          <ChatInterface
+            messages={messages}
+            conversationId={activeConvId}
+            onMessagesChange={setMessages}
+            onConversationChange={handleConversationChange}
+          />
         </main>
       </div>
     </div>
