@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os as _os
 from uuid import UUID, uuid4
 
 import asyncpg
@@ -29,8 +30,6 @@ from backend.strategies.vectordb.qdrant_db import QdrantDB
 
 logger = logging.getLogger(__name__)
 app = FastAPI(title="kapa-rag query service")
-
-import os as _os
 
 _ALLOWED_ORIGINS = [
     "http://localhost:3001",
