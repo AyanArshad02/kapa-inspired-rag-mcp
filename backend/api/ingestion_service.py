@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os as _os
 from pathlib import Path
 from uuid import UUID
 
@@ -21,8 +22,6 @@ from backend.strategies.storage.s3_storage import S3Storage
 
 logger = logging.getLogger(__name__)
 app = FastAPI(title="kapa-rag ingestion service")
-
-import os as _os
 
 _ALLOWED_ORIGINS = [
     "http://localhost:3001",

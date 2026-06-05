@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os as _os
 from uuid import UUID, uuid4
 
 import asyncpg
@@ -23,13 +24,12 @@ from backend.strategies.cache.redis_cache import RedisCache
 from backend.strategies.embedding.openai_embedding import OpenAIEmbedding
 from backend.strategies.embedding.tf_sparse_encoder import TFSparseEncoder
 from backend.strategies.llm.openai_llm import OpenAILLM
+from backend.strategies.llm.openrouter_llm import OpenRouterLLM
 from backend.strategies.reranker.cohere_reranker import CohereReranker
 from backend.strategies.vectordb.qdrant_db import QdrantDB
 
 logger = logging.getLogger(__name__)
 app = FastAPI(title="kapa-rag query service")
-
-import os as _os
 
 _ALLOWED_ORIGINS = [
     "http://localhost:3001",
@@ -64,8 +64,9 @@ async def startup() -> None:
 
     logger.info("query service started")
     cache = RedisCache()
+    llm = OpenRouterLLM() if settings.llm_provider == "openrouter" else OpenAILLM()
     app.state.pipeline = QueryPipeline(
-        llm=OpenAILLM(),
+        llm=llm,
         embedder=OpenAIEmbedding(),
         sparse_encoder=TFSparseEncoder(),
         vector_db=QdrantDB(),

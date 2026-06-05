@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import hashlib
+import os as _os
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 import asyncpg
 from fastapi import Cookie, FastAPI, HTTPException, Request, Response
@@ -14,8 +15,6 @@ from pydantic import BaseModel, EmailStr
 from backend.config import settings
 
 app = FastAPI(title="kapa-rag auth service")
-
-import os as _os
 
 _ALLOWED_ORIGINS = [
     "http://localhost:3001",
@@ -80,7 +79,7 @@ class MeResponse(BaseModel):
 def _make_access_token(tenant_id: str, api_key: str, email: str) -> str:
     """Short-lived JWT (15 min). Carries tenant_id + api_key so downstream
     services can validate without a DB lookup."""
-    expire = datetime.now(timezone.utc) + timedelta(
+    expire = datetime.now(datetime.UTC) + timedelta(
         minutes=settings.jwt_access_expire_minutes
     )
     return jwt.encode(
@@ -137,7 +136,7 @@ async def signup(
         api_key_hash = hashlib.sha256(api_key.encode()).hexdigest()
         password_hash = _pwd.hash(body.password)
         raw_refresh, refresh_hash = _make_refresh_token()
-        refresh_expires = datetime.now(timezone.utc) + timedelta(
+        refresh_expires = datetime.now(datetime.UTC) + timedelta(
             days=settings.jwt_refresh_expire_days
         )
 
@@ -189,7 +188,7 @@ async def login(
         user_id = str(row["user_id"])
         tenant_id = str(row["tenant_id"])
         raw_refresh, refresh_hash = _make_refresh_token()
-        refresh_expires = datetime.now(timezone.utc) + timedelta(
+        refresh_expires = datetime.now(datetime.UTC) + timedelta(
             days=settings.jwt_refresh_expire_days
         )
 
@@ -227,7 +226,7 @@ async def refresh(
 
     pool: asyncpg.Pool = request.app.state.pool
     token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(datetime.UTC)
 
     async with pool.acquire() as conn:
         row = await conn.fetchrow(

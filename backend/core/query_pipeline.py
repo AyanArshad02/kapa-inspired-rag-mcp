@@ -78,7 +78,9 @@ class QueryPipeline:
         cached_result = await self._cache.get(cache_key)
         if cached_result:
             logger.info("cache_hit tenant=%s", tenant_id)
-            stub = ContextWindow(query=query, tenant_id=tenant_id, chunks=cached_result.source_chunks)
+            stub = ContextWindow(
+                query=query, tenant_id=tenant_id, chunks=cached_result.source_chunks
+            )
             asyncio.create_task(self._run_observers(stub, cached_result))
             return cached_result
 
@@ -114,7 +116,9 @@ class QueryPipeline:
         cached_result = await self._cache.get(cache_key)
         if cached_result:
             logger.info("cache_hit tenant=%s", tenant_id)
-            stub = ContextWindow(query=query, tenant_id=tenant_id, chunks=cached_result.source_chunks)
+            stub = ContextWindow(
+                query=query, tenant_id=tenant_id, chunks=cached_result.source_chunks
+            )
             asyncio.create_task(self._run_observers(stub, cached_result))
             yield cached_result.answer
             return
