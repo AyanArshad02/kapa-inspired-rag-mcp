@@ -77,6 +77,7 @@ MCP_NOTES.md
 CI_CD_NOTES.md
 PROJECT_GUIDE.md
 RAGAS_NOTES.md
+REDIS_CELERY_NOTES.md
 
 blogs/
 .claude/

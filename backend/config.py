@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     llm_fast_model: str = "gpt-4o-mini"
     llm_fast_token_threshold: int = 500
 
+    llm_provider: str = "openai"
+    openrouter_api_key: str = ""
+    openrouter_model: str = "nvidia/nemotron-3-super-120b-a12b:free"
+
     top_k_retrieval: int = 20
     top_n_rerank: int = 5
     max_context_tokens: int = 6000

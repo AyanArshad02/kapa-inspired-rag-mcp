@@ -23,6 +23,7 @@ from backend.strategies.cache.redis_cache import RedisCache
 from backend.strategies.embedding.openai_embedding import OpenAIEmbedding
 from backend.strategies.embedding.tf_sparse_encoder import TFSparseEncoder
 from backend.strategies.llm.openai_llm import OpenAILLM
+from backend.strategies.llm.openrouter_llm import OpenRouterLLM
 from backend.strategies.reranker.cohere_reranker import CohereReranker
 from backend.strategies.vectordb.qdrant_db import QdrantDB
 
@@ -64,8 +65,9 @@ async def startup() -> None:
 
     logger.info("query service started")
     cache = RedisCache()
+    llm = OpenRouterLLM() if settings.llm_provider == "openrouter" else OpenAILLM()
     app.state.pipeline = QueryPipeline(
-        llm=OpenAILLM(),
+        llm=llm,
         embedder=OpenAIEmbedding(),
         sparse_encoder=TFSparseEncoder(),
         vector_db=QdrantDB(),
