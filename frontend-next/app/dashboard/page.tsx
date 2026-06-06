@@ -58,7 +58,6 @@ export default function DashboardPage() {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-5 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
-          <span className="text-xl">🤖</span>
           <span className="text-base font-semibold text-gray-900">Kapa RAG</span>
         </div>
         <div className="flex items-center gap-4">
@@ -68,7 +67,7 @@ export default function DashboardPage() {
               href="/admin"
               className="text-sm text-purple-600 hover:text-purple-800 border border-purple-200 px-3 py-1 rounded-lg hover:bg-purple-50 transition-colors font-medium"
             >
-              ⚙️ Admin
+              Admin
             </Link>
           )}
           <button
@@ -94,7 +93,7 @@ export default function DashboardPage() {
                   : 'text-gray-400 hover:text-gray-600'
               }`}
             >
-              💬 CHATS
+              CHATS
             </button>
             <button
               onClick={() => setTab('sources')}
@@ -104,7 +103,7 @@ export default function DashboardPage() {
                   : 'text-gray-400 hover:text-gray-600'
               }`}
             >
-              📚 SOURCES
+              SOURCES
             </button>
           </div>
 
