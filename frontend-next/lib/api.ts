@@ -26,6 +26,15 @@ export async function signupApi(email: string, password: string): Promise<{ acce
   return res.json()
 }
 
+export async function guestLoginApi(): Promise<{ access_token: string }> {
+  const res = await fetch(`${AUTH_URL}/auth/guest`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+  if (!res.ok) throw new Error('Guest login failed')
+  return res.json()
+}
+
 export async function loginApi(email: string, password: string): Promise<{ access_token: string }> {
   const res = await fetch(`${AUTH_URL}/auth/login`, {
     method: 'POST',
