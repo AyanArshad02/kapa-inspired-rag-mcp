@@ -20,6 +20,7 @@ from backend.observers.cache_observer import CacheObserver
 from backend.observers.metrics_observer import MetricsObserver
 from backend.observers.trace_observer import TraceObserver
 from backend.repositories.postgres_conversation_repo import PostgresConversationRepository
+from backend.repositories.postgres_source_hash_repo import PostgresSourceHashRepository
 from backend.strategies.cache.redis_cache import RedisCache
 from backend.strategies.embedding.openai_embedding import OpenAIEmbedding
 from backend.strategies.embedding.tf_sparse_encoder import TFSparseEncoder
@@ -78,6 +79,7 @@ async def startup() -> None:
             TraceObserver(),
             MetricsObserver(),
         ],
+        source_hash_repo=PostgresSourceHashRepository(pool),
     )
 
 

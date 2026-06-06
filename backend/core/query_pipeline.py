@@ -24,7 +24,7 @@ from backend.exceptions import KapaError
 from backend.models import ContextWindow, QueryResult, Turn
 from backend.observers.base import QueryObserver
 from backend.observers.error_metrics import rag_errors_total
-from backend.repositories.base import ConversationRepository
+from backend.repositories.base import ConversationRepository, SourceHashRepository
 from backend.strategies.base import (
     CacheStrategy,
     EmbeddingStrategy,
@@ -56,6 +56,7 @@ class QueryPipeline:
         cache: CacheStrategy,
         conversation_repo: ConversationRepository,
         observers: list[QueryObserver],
+        source_hash_repo: SourceHashRepository | None = None,
     ) -> None:
         self._llm = llm
         self._embedder = embedder
@@ -65,6 +66,7 @@ class QueryPipeline:
         self._cache = cache
         self._conversation_repo = conversation_repo
         self._observers = observers
+        self._source_hash_repo = source_hash_repo
         self._context_builder = ContextWindowBuilder()
 
     async def handle(
@@ -158,10 +160,19 @@ class QueryPipeline:
     ) -> ContextWindow:
         """Embed query, retrieve chunks, rerank, load history — all in parallel where possible."""
 
-        # embed + load history run concurrently — neither depends on the other
-        (dense_vec, sparse_pairs), recent_turns = await asyncio.gather(
+        # embed + load history + source lookup run concurrently
+        async def _no_sources() -> list:
+            return []
+
+        source_coro = (
+            self._source_hash_repo.list_by_tenant(tenant_id)
+            if self._source_hash_repo
+            else _no_sources()
+        )
+        (dense_vec, sparse_pairs), recent_turns, tenant_sources = await asyncio.gather(
             self._embed_query(query),
             self._conversation_repo.get_recent_turns(conversation_id, limit=3),
+            source_coro,
         )
 
         sparse_indices, sparse_values = sparse_pairs[0]
@@ -176,12 +187,14 @@ class QueryPipeline:
 
         reranked = await self._reranker.rerank(query, chunks, top_n=_TOP_N_RERANK)
 
-        return self._context_builder.build(
+        context = self._context_builder.build(
             query=query,
             chunks=reranked,
             history=recent_turns,
             tenant_id=tenant_id,
         )
+        context.tenant_sources = tenant_sources
+        return context
 
     async def _embed_query(
         self, query: str

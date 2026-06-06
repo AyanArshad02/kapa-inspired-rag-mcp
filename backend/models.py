@@ -85,6 +85,7 @@ class ContextWindow:
     conversation_history: list[Turn] = field(default_factory=list)
     total_tokens: int = 0
     tenant_id: str = ""
+    tenant_sources: list[dict] = field(default_factory=list)
 
 
 @dataclass
