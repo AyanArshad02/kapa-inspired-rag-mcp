@@ -175,19 +175,31 @@ from backend.models import IngestionStatus  # noqa: E402
 # ---------------------------------------------------------------------------
 
 
-class CacheStrategy(ABC):
-    """Read-through cache for query results."""
+class SemanticCacheStrategy(ABC):
+    """Semantic vector cache for query results.
+
+    Uses embedding similarity instead of exact key matching.
+    get() returns a cached result if a stored query has cosine similarity
+    >= 0.95 with the incoming query. set() stores a new result indexed
+    by its embedding.
+    """
 
     @abstractmethod
-    async def get(self, key: str) -> QueryResult | None:
+    async def get(
+        self, embedding: list[float], tenant_id: str
+    ) -> QueryResult | None:
+        """Return a cached result for a semantically similar query, or None."""
         ...
 
     @abstractmethod
-    async def set(self, key: str, result: QueryResult, ttl_seconds: int) -> None:
-        ...
-
-    @abstractmethod
-    async def invalidate(self, key: str) -> None:
+    async def set(
+        self,
+        embedding: list[float],
+        tenant_id: str,
+        result: QueryResult,
+        ttl_seconds: int,
+    ) -> None:
+        """Store a result indexed by the query embedding."""
         ...
 
 
