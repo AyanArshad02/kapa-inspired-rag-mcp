@@ -13,6 +13,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel
 from starlette.responses import Response as _PrometheusResponse
 
+from backend.api.admin_service import router as admin_router
 from backend.api.middleware.auth import get_tenant_id
 from backend.config import settings
 from backend.core.query_pipeline import QueryPipeline
@@ -31,6 +32,7 @@ from backend.strategies.vectordb.qdrant_db import QdrantDB
 
 logger = logging.getLogger(__name__)
 app = FastAPI(title="kapa-rag query service")
+app.include_router(admin_router)
 
 _ALLOWED_ORIGINS = [
     "http://localhost:3001",

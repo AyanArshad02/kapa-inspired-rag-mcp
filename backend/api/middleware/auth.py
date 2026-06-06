@@ -31,3 +31,18 @@ async def get_tenant_id(
         raise HTTPException(status_code=401, detail="Invalid API key")
 
     return tenant_id
+
+
+async def require_admin(
+    credentials: HTTPAuthorizationCredentials = Security(_bearer),
+) -> None:
+    """Dependency that blocks non-admin users with 403."""
+    try:
+        payload = jwt.decode(
+            credentials.credentials, settings.jwt_secret, algorithms=["HS256"]
+        )
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    if not payload.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/components/AuthContext'
 import AddSourcePanel from '@/components/AddSourcePanel'
@@ -62,6 +63,14 @@ export default function DashboardPage() {
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-500">{user.email}</span>
+          {user.isAdmin && (
+            <Link
+              href="/admin"
+              className="text-sm text-purple-600 hover:text-purple-800 border border-purple-200 px-3 py-1 rounded-lg hover:bg-purple-50 transition-colors font-medium"
+            >
+              ⚙️ Admin
+            </Link>
+          )}
           <button
             onClick={() => logout().then(() => router.push('/login'))}
             className="text-sm text-gray-500 hover:text-gray-700 border border-gray-200 px-3 py-1 rounded-lg hover:bg-gray-50 transition-colors"

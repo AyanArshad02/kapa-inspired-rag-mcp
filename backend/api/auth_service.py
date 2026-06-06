@@ -76,15 +76,20 @@ class MeResponse(BaseModel):
 
 # ── Token helpers ─────────────────────────────────────────────────────────────
 
-def _make_access_token(tenant_id: str, api_key: str, email: str) -> str:
+def _make_access_token(
+    tenant_id: str, api_key: str, email: str, is_admin: bool = False
+) -> str:
     """Short-lived JWT (15 min). Carries tenant_id + api_key so downstream
     services can validate without a DB lookup."""
     expire = datetime.now(UTC) + timedelta(
         minutes=settings.jwt_access_expire_minutes
     )
     return jwt.encode(
-        {"sub": email, "tenant_id": tenant_id, "api_key": api_key,
-         "email": email, "exp": expire, "type": "access"},
+        {
+            "sub": email, "tenant_id": tenant_id, "api_key": api_key,
+            "email": email, "exp": expire, "type": "access",
+            "is_admin": is_admin,
+        },
         settings.jwt_secret,
         algorithm="HS256",
     )
@@ -163,7 +168,7 @@ async def signup(
 
     _set_refresh_cookie(response, raw_refresh)
     return TokenResponse(
-        access_token=_make_access_token(tenant_id, api_key, body.email)
+        access_token=_make_access_token(tenant_id, api_key, body.email, is_admin=False)
     )
 
 
@@ -225,7 +230,7 @@ async def guest_login(request: Request, response: Response) -> TokenResponse:
 
     _set_refresh_cookie(response, raw_refresh)
     return TokenResponse(
-        access_token=_make_access_token(tenant_id, api_key, _GUEST_EMAIL)
+        access_token=_make_access_token(tenant_id, api_key, _GUEST_EMAIL, is_admin=False)
     )
 
 
@@ -239,7 +244,7 @@ async def login(
 
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "SELECT user_id, tenant_id, password_hash, api_key "
+            "SELECT user_id, tenant_id, password_hash, api_key, is_admin "
             "FROM users WHERE email = $1",
             body.email,
         )
@@ -265,7 +270,9 @@ async def login(
 
     _set_refresh_cookie(response, raw_refresh)
     return TokenResponse(
-        access_token=_make_access_token(tenant_id, row["api_key"], body.email)
+        access_token=_make_access_token(
+            tenant_id, row["api_key"], body.email, bool(row["is_admin"])
+        )
     )
 
 
@@ -292,7 +299,7 @@ async def refresh(
 
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "SELECT rt.user_id, rt.expires_at, u.tenant_id, u.email, u.api_key "
+            "SELECT rt.user_id, rt.expires_at, u.tenant_id, u.email, u.api_key, u.is_admin "
             "FROM refresh_tokens rt "
             "JOIN users u ON u.user_id = rt.user_id "
             "WHERE rt.token_hash = $1",
@@ -327,7 +334,7 @@ async def refresh(
     _set_refresh_cookie(response, new_raw)
     return TokenResponse(
         access_token=_make_access_token(
-            str(row["tenant_id"]), row["api_key"], row["email"]
+            str(row["tenant_id"]), row["api_key"], row["email"], bool(row["is_admin"])
         )
     )
 

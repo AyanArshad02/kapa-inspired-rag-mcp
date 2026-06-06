@@ -194,3 +194,28 @@ export async function queryApi(query: string, conversationId: string | null): Pr
   if (!res.ok) throw new Error(`Query failed (${res.status}): ${await res.text()}`)
   return res.json()
 }
+
+// ── Admin ─────────────────────────────────────────────────────────────────────
+
+export interface AdminTenant {
+  tenant_id: string
+  name: string
+  email: string
+  is_admin: boolean
+  source_count: number
+  conversation_count: number
+  query_count: number
+}
+
+export interface AdminOverview {
+  totals: { tenants: number; users: number; sources: number; queries: number }
+  tenants: AdminTenant[]
+  recent_queries: { content: string; tenant_name: string; created_at: string }[]
+  sources_by_type: { type: string; count: number }[]
+}
+
+export async function adminOverviewApi(): Promise<AdminOverview> {
+  const res = await authFetch(`${QUERY_URL}/admin/overview`)
+  if (!res.ok) throw new Error('Failed to load admin overview')
+  return res.json()
+}
