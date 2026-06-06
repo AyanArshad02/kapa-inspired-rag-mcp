@@ -86,6 +86,7 @@ class ContextWindow:
     total_tokens: int = 0
     tenant_id: str = ""
     tenant_sources: list[dict] = field(default_factory=list)
+    query_embedding: list[float] = field(default_factory=list)
 
 
 @dataclass
