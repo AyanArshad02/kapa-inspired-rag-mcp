@@ -50,10 +50,10 @@ class TestOpenAILLM:
         assert _select_model(ctx) == settings.llm_default_model
 
     def test_build_messages_includes_system_and_query(self):
-        from backend.strategies.llm.openai_llm import _build_messages
+        from backend.strategies.llm._prompts import build_messages
 
         ctx = _make_context()
-        messages = _build_messages(ctx)
+        messages = build_messages(ctx)
 
         roles = [m["role"] for m in messages]
         assert roles[0] == "system"
@@ -61,10 +61,10 @@ class TestOpenAILLM:
         assert ctx.query in messages[-1]["content"]
 
     def test_build_messages_includes_chunk_sources(self):
-        from backend.strategies.llm.openai_llm import _build_messages
+        from backend.strategies.llm._prompts import build_messages
 
         ctx = _make_context()
-        messages = _build_messages(ctx)
+        messages = build_messages(ctx)
         last_msg = messages[-1]["content"]
 
         for chunk in ctx.chunks:
@@ -75,7 +75,7 @@ class TestOpenAILLM:
         from uuid import uuid4
 
         from backend.models import Turn
-        from backend.strategies.llm.openai_llm import _build_messages
+        from backend.strategies.llm._prompts import build_messages
         ctx = _make_context()
         conv_id = uuid4()
         ctx.conversation_history = [
@@ -86,7 +86,7 @@ class TestOpenAILLM:
             )
         ]
 
-        messages = _build_messages(ctx)
+        messages = build_messages(ctx)
         roles = [m["role"] for m in messages]
         assert "user" in roles
         assert "assistant" in roles

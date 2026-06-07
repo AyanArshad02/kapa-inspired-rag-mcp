@@ -77,7 +77,7 @@ class TestRedisSemanticCache:
         cache, mock_redis = self._make_cache()
         original = _make_result()
         doc = MagicMock()
-        doc.score = "0.2"  # distance > 0.05 → miss
+        doc.score = "0.2"  # distance > 0.10 → miss
         doc.payload = _serialize(original)
         ft_mock = AsyncMock()
         ft_mock.search = AsyncMock(return_value=MagicMock(docs=[doc]))
@@ -91,8 +91,8 @@ class TestRedisSemanticCache:
         cache, mock_redis = self._make_cache()
         original = _make_result()
         doc = MagicMock()
-        doc.score = "0.01"  # distance ≤ 0.05 → hit
-        doc.payload = _serialize(original)
+        doc.score = "0.01"  # distance ≤ 0.10 → hit
+        doc.result_json = _serialize(original)
         ft_mock = AsyncMock()
         ft_mock.search = AsyncMock(return_value=MagicMock(docs=[doc]))
         mock_redis.ft = MagicMock(return_value=ft_mock)
