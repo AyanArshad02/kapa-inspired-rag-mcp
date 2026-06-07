@@ -15,8 +15,8 @@ from backend.strategies.base import SemanticCacheStrategy
 
 _INDEX_NAME = "semcache_idx"
 _KEY_PREFIX = "semcache:"
-# cosine distance = 1 - similarity; threshold = 0.05 → similarity >= 0.95
-_DISTANCE_THRESHOLD = 0.05
+# cosine distance = 1 - similarity; threshold = 0.10 → similarity >= 0.90
+_DISTANCE_THRESHOLD = 0.10
 
 
 class RedisSemanticCache(SemanticCacheStrategy):
@@ -60,10 +60,12 @@ class RedisSemanticCache(SemanticCacheStrategy):
     async def get(self, embedding: list[float], tenant_id: str) -> QueryResult | None:
         await self._ensure_index()
         vec_bytes = _to_bytes(embedding)
+        # RediSearch treats '-' as NOT operator — escape UUID hyphens
+        safe_tenant_id = tenant_id.replace("-", "\\-")
         q = (
-            Query(f"(@tenant_id:{{{tenant_id}}})=>[KNN 1 @embedding $vec AS score]")
+            Query(f"(@tenant_id:{{{safe_tenant_id}}})=>[KNN 1 @embedding $vec AS score]")
             .sort_by("score")
-            .return_fields("score", "payload")
+            .return_fields("score", "result_json")
             .dialect(2)
         )
         results = await self._redis.ft(_INDEX_NAME).search(
@@ -72,10 +74,12 @@ class RedisSemanticCache(SemanticCacheStrategy):
         if not results.docs:
             return None
         doc = results.docs[0]
-        distance = float(doc.score)
+        # score field comes back as bytes when decode_responses=False
+        score_raw = doc.score
+        distance = float(score_raw.decode() if isinstance(score_raw, bytes) else score_raw)
         if distance > _DISTANCE_THRESHOLD:
             return None
-        raw = doc.payload if isinstance(doc.payload, str) else doc.payload.decode()
+        raw = doc.result_json if isinstance(doc.result_json, str) else doc.result_json.decode()
         return _deserialize(raw)
 
     async def set(
@@ -92,7 +96,7 @@ class RedisSemanticCache(SemanticCacheStrategy):
             mapping={
                 b"tenant_id": tenant_id.encode(),
                 b"embedding": _to_bytes(embedding),
-                b"payload": _serialize(result).encode(),
+                b"result_json": _serialize(result).encode(),
             },
         )
         await self._redis.expire(key, ttl_seconds)
