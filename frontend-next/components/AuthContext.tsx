@@ -13,6 +13,7 @@ import { logoutApi, refreshApi, setAccessToken } from '@/lib/api'
 interface User {
   email: string
   tenantId: string
+  isAdmin: boolean
 }
 
 interface AuthContextValue {
@@ -27,7 +28,11 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 function decodeUser(token: string): User | null {
   try {
     const payload = JSON.parse(atob(token.split('.')[1]))
-    return { email: payload.email, tenantId: payload.tenant_id }
+    return {
+      email: payload.email,
+      tenantId: payload.tenant_id,
+      isAdmin: payload.is_admin === true,
+    }
   } catch {
     return null
   }

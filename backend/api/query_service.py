@@ -13,6 +13,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel
 from starlette.responses import Response as _PrometheusResponse
 
+from backend.api.admin_service import router as admin_router
 from backend.api.middleware.auth import get_tenant_id
 from backend.config import settings
 from backend.core.query_pipeline import QueryPipeline
@@ -20,7 +21,8 @@ from backend.observers.cache_observer import CacheObserver
 from backend.observers.metrics_observer import MetricsObserver
 from backend.observers.trace_observer import TraceObserver
 from backend.repositories.postgres_conversation_repo import PostgresConversationRepository
-from backend.strategies.cache.redis_cache import RedisCache
+from backend.repositories.postgres_source_hash_repo import PostgresSourceHashRepository
+from backend.strategies.cache.redis_semantic_cache import RedisSemanticCache
 from backend.strategies.embedding.openai_embedding import OpenAIEmbedding
 from backend.strategies.embedding.tf_sparse_encoder import TFSparseEncoder
 from backend.strategies.llm.openai_llm import OpenAILLM
@@ -30,6 +32,7 @@ from backend.strategies.vectordb.qdrant_db import QdrantDB
 
 logger = logging.getLogger(__name__)
 app = FastAPI(title="kapa-rag query service")
+app.include_router(admin_router)
 
 _ALLOWED_ORIGINS = [
     "http://localhost:3001",
@@ -63,7 +66,7 @@ async def startup() -> None:
     app.state.tenant_repo = PostgresTenantRepository(pool)
 
     logger.info("query service started")
-    cache = RedisCache()
+    cache = RedisSemanticCache()
     llm = OpenRouterLLM() if settings.llm_provider == "openrouter" else OpenAILLM()
     app.state.pipeline = QueryPipeline(
         llm=llm,
@@ -78,6 +81,7 @@ async def startup() -> None:
             TraceObserver(),
             MetricsObserver(),
         ],
+        source_hash_repo=PostgresSourceHashRepository(pool),
     )
 
 

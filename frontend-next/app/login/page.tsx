@@ -4,7 +4,7 @@ import { type FormEvent, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/components/AuthContext'
-import { loginApi } from '@/lib/api'
+import { guestLoginApi, loginApi } from '@/lib/api'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -13,6 +13,20 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false)
   const { setAuth } = useAuth()
   const router = useRouter()
+
+  async function handleGuest() {
+    setError('')
+    setBusy(true)
+    try {
+      const { access_token } = await guestLoginApi()
+      setAuth(access_token)
+      router.push('/dashboard')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Guest login failed')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -33,7 +47,6 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="text-3xl mb-2">🤖</div>
           <h1 className="text-2xl font-bold text-gray-900">Kapa RAG</h1>
           <p className="text-sm text-gray-500 mt-1">Sign in to your account</p>
         </div>
@@ -82,6 +95,24 @@ export default function LoginPage() {
               {busy ? 'Signing in…' : 'Sign in'}
             </button>
           </form>
+
+          <div className="mt-4 relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-200" />
+            </div>
+            <div className="relative flex justify-center text-xs text-gray-400">
+              <span className="bg-white px-2">or</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleGuest}
+            disabled={busy}
+            className="w-full mt-3 border border-gray-300 text-gray-700 py-2 px-4 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Continue as Guest
+          </button>
 
           <p className="text-center text-sm text-gray-500 mt-4">
             No account?{' '}

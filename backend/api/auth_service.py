@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import os as _os
 import secrets
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import asyncpg
 from fastapi import Cookie, FastAPI, HTTPException, Request, Response
@@ -76,15 +76,20 @@ class MeResponse(BaseModel):
 
 # ── Token helpers ─────────────────────────────────────────────────────────────
 
-def _make_access_token(tenant_id: str, api_key: str, email: str) -> str:
+def _make_access_token(
+    tenant_id: str, api_key: str, email: str, is_admin: bool = False
+) -> str:
     """Short-lived JWT (15 min). Carries tenant_id + api_key so downstream
     services can validate without a DB lookup."""
-    expire = datetime.now(datetime.UTC) + timedelta(
+    expire = datetime.now(UTC) + timedelta(
         minutes=settings.jwt_access_expire_minutes
     )
     return jwt.encode(
-        {"sub": email, "tenant_id": tenant_id, "api_key": api_key,
-         "email": email, "exp": expire, "type": "access"},
+        {
+            "sub": email, "tenant_id": tenant_id, "api_key": api_key,
+            "email": email, "exp": expire, "type": "access",
+            "is_admin": is_admin,
+        },
         settings.jwt_secret,
         algorithm="HS256",
     )
@@ -136,7 +141,7 @@ async def signup(
         api_key_hash = hashlib.sha256(api_key.encode()).hexdigest()
         password_hash = _pwd.hash(body.password)
         raw_refresh, refresh_hash = _make_refresh_token()
-        refresh_expires = datetime.now(datetime.UTC) + timedelta(
+        refresh_expires = datetime.now(UTC) + timedelta(
             days=settings.jwt_refresh_expire_days
         )
 
@@ -163,7 +168,69 @@ async def signup(
 
     _set_refresh_cookie(response, raw_refresh)
     return TokenResponse(
-        access_token=_make_access_token(tenant_id, api_key, body.email)
+        access_token=_make_access_token(tenant_id, api_key, body.email, is_admin=False)
+    )
+
+
+# ── Guest login ───────────────────────────────────────────────────────────────
+
+_GUEST_EMAIL = "guest@demo.kapa"
+
+
+@app.post("/auth/guest", response_model=TokenResponse)
+async def guest_login(request: Request, response: Response) -> TokenResponse:
+    """Issue a JWT for the shared guest account — no password required.
+
+    Creates the guest user + tenant on first call; reuses them on every
+    subsequent call. All visitors who click 'Continue as Guest' share the
+    same tenant so ingested demo data is visible to everyone.
+    """
+    pool: asyncpg.Pool = request.app.state.pool
+
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT u.user_id, u.api_key, u.tenant_id "
+            "FROM users u WHERE u.email = $1",
+            _GUEST_EMAIL,
+        )
+
+        if row is None:
+            api_key = secrets.token_urlsafe(32)
+            api_key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+            # Random unusable password — guest account is only accessible via this endpoint
+            password_hash = _pwd.hash(secrets.token_urlsafe(32))
+
+            async with conn.transaction():
+                tenant = await conn.fetchrow(
+                    "INSERT INTO tenants (name, api_key_hash) VALUES ($1, $2) "
+                    "RETURNING tenant_id",
+                    "Guest Demo", api_key_hash,
+                )
+                tenant_id = str(tenant["tenant_id"])
+                user = await conn.fetchrow(
+                    "INSERT INTO users (tenant_id, email, password_hash, api_key) "
+                    "VALUES ($1, $2, $3, $4) RETURNING user_id",
+                    tenant_id, _GUEST_EMAIL, password_hash, api_key,
+                )
+                user_id = str(user["user_id"])
+        else:
+            user_id = str(row["user_id"])
+            tenant_id = str(row["tenant_id"])
+            api_key = row["api_key"]
+
+        raw_refresh, refresh_hash = _make_refresh_token()
+        refresh_expires = datetime.now(UTC) + timedelta(
+            days=settings.jwt_refresh_expire_days
+        )
+        await conn.execute(
+            "INSERT INTO refresh_tokens (token_hash, user_id, expires_at) "
+            "VALUES ($1, $2, $3)",
+            refresh_hash, user_id, refresh_expires,
+        )
+
+    _set_refresh_cookie(response, raw_refresh)
+    return TokenResponse(
+        access_token=_make_access_token(tenant_id, api_key, _GUEST_EMAIL, is_admin=False)
     )
 
 
@@ -177,7 +244,7 @@ async def login(
 
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "SELECT user_id, tenant_id, password_hash, api_key "
+            "SELECT user_id, tenant_id, password_hash, api_key, is_admin "
             "FROM users WHERE email = $1",
             body.email,
         )
@@ -188,7 +255,7 @@ async def login(
         user_id = str(row["user_id"])
         tenant_id = str(row["tenant_id"])
         raw_refresh, refresh_hash = _make_refresh_token()
-        refresh_expires = datetime.now(datetime.UTC) + timedelta(
+        refresh_expires = datetime.now(UTC) + timedelta(
             days=settings.jwt_refresh_expire_days
         )
 
@@ -203,7 +270,9 @@ async def login(
 
     _set_refresh_cookie(response, raw_refresh)
     return TokenResponse(
-        access_token=_make_access_token(tenant_id, row["api_key"], body.email)
+        access_token=_make_access_token(
+            tenant_id, row["api_key"], body.email, bool(row["is_admin"])
+        )
     )
 
 
@@ -226,11 +295,11 @@ async def refresh(
 
     pool: asyncpg.Pool = request.app.state.pool
     token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
-    now = datetime.now(datetime.UTC)
+    now = datetime.now(UTC)
 
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "SELECT rt.user_id, rt.expires_at, u.tenant_id, u.email, u.api_key "
+            "SELECT rt.user_id, rt.expires_at, u.tenant_id, u.email, u.api_key, u.is_admin "
             "FROM refresh_tokens rt "
             "JOIN users u ON u.user_id = rt.user_id "
             "WHERE rt.token_hash = $1",
@@ -265,7 +334,7 @@ async def refresh(
     _set_refresh_cookie(response, new_raw)
     return TokenResponse(
         access_token=_make_access_token(
-            str(row["tenant_id"]), row["api_key"], row["email"]
+            str(row["tenant_id"]), row["api_key"], row["email"], bool(row["is_admin"])
         )
     )
 

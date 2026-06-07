@@ -26,6 +26,15 @@ export async function signupApi(email: string, password: string): Promise<{ acce
   return res.json()
 }
 
+export async function guestLoginApi(): Promise<{ access_token: string }> {
+  const res = await fetch(`${AUTH_URL}/auth/guest`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+  if (!res.ok) throw new Error('Guest login failed')
+  return res.json()
+}
+
 export async function loginApi(email: string, password: string): Promise<{ access_token: string }> {
   const res = await fetch(`${AUTH_URL}/auth/login`, {
     method: 'POST',
@@ -183,5 +192,30 @@ export async function queryApi(query: string, conversationId: string | null): Pr
     body: JSON.stringify({ query, stream: false, conversation_id: conversationId }),
   })
   if (!res.ok) throw new Error(`Query failed (${res.status}): ${await res.text()}`)
+  return res.json()
+}
+
+// ── Admin ─────────────────────────────────────────────────────────────────────
+
+export interface AdminTenant {
+  tenant_id: string
+  name: string
+  email: string
+  is_admin: boolean
+  source_count: number
+  conversation_count: number
+  query_count: number
+}
+
+export interface AdminOverview {
+  totals: { tenants: number; users: number; sources: number; queries: number }
+  tenants: AdminTenant[]
+  recent_queries: { content: string; tenant_name: string; created_at: string }[]
+  sources_by_type: { type: string; count: number }[]
+}
+
+export async function adminOverviewApi(): Promise<AdminOverview> {
+  const res = await authFetch(`${QUERY_URL}/admin/overview`)
+  if (!res.ok) throw new Error('Failed to load admin overview')
   return res.json()
 }

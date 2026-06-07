@@ -14,7 +14,6 @@ QueryPipeline:
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import logging
 from collections.abc import AsyncIterator
 from uuid import UUID
@@ -24,12 +23,12 @@ from backend.exceptions import KapaError
 from backend.models import ContextWindow, QueryResult, Turn
 from backend.observers.base import QueryObserver
 from backend.observers.error_metrics import rag_errors_total
-from backend.repositories.base import ConversationRepository
+from backend.repositories.base import ConversationRepository, SourceHashRepository
 from backend.strategies.base import (
-    CacheStrategy,
     EmbeddingStrategy,
     LLMStrategy,
     RerankerStrategy,
+    SemanticCacheStrategy,
     SparseEncoderStrategy,
     VectorDBStrategy,
 )
@@ -53,9 +52,10 @@ class QueryPipeline:
         sparse_encoder: SparseEncoderStrategy,
         vector_db: VectorDBStrategy,
         reranker: RerankerStrategy,
-        cache: CacheStrategy,
+        cache: SemanticCacheStrategy,
         conversation_repo: ConversationRepository,
         observers: list[QueryObserver],
+        source_hash_repo: SourceHashRepository | None = None,
     ) -> None:
         self._llm = llm
         self._embedder = embedder
@@ -65,6 +65,7 @@ class QueryPipeline:
         self._cache = cache
         self._conversation_repo = conversation_repo
         self._observers = observers
+        self._source_hash_repo = source_hash_repo
         self._context_builder = ContextWindowBuilder()
 
     async def handle(
@@ -74,18 +75,25 @@ class QueryPipeline:
         conversation_id: UUID,
     ) -> QueryResult:
         """Run the full pipeline and return a complete (non-streamed) answer."""
-        cache_key = _cache_key(query, tenant_id)
-        cached_result = await self._cache.get(cache_key)
+        dense_vec, sparse_pairs = await self._embed_query(query)
+        embedding = dense_vec[0]
+
+        cached_result = await self._cache.get(embedding, tenant_id)
         if cached_result:
             logger.info("cache_hit tenant=%s", tenant_id)
             stub = ContextWindow(
-                query=query, tenant_id=tenant_id, chunks=cached_result.source_chunks
+                query=query,
+                tenant_id=tenant_id,
+                chunks=cached_result.source_chunks,
+                query_embedding=embedding,
             )
             asyncio.create_task(self._run_observers(stub, cached_result))
             return cached_result
 
         try:
-            context = await self._build_context(query, tenant_id, conversation_id)
+            context = await self._build_context(
+                query, tenant_id, conversation_id, dense_vec, sparse_pairs
+            )
             result = await self._llm.generate(context)
         except KapaError as exc:
             rag_errors_total.labels(
@@ -100,7 +108,9 @@ class QueryPipeline:
         result.conversation_id = conversation_id
 
         asyncio.create_task(self._run_observers(context, result))
-        asyncio.create_task(self._cache.set(cache_key, result, _CACHE_TTL_SECONDS))
+        asyncio.create_task(
+            self._cache.set(embedding, tenant_id, result, _CACHE_TTL_SECONDS)
+        )
         asyncio.create_task(self._save_turn(query, result.answer, conversation_id, tenant_id))
 
         return result
@@ -112,19 +122,26 @@ class QueryPipeline:
         conversation_id: UUID,
     ) -> AsyncIterator[str]:
         """Stream answer tokens as they arrive. Used for SSE responses."""
-        cache_key = _cache_key(query, tenant_id)
-        cached_result = await self._cache.get(cache_key)
+        dense_vec, sparse_pairs = await self._embed_query(query)
+        embedding = dense_vec[0]
+
+        cached_result = await self._cache.get(embedding, tenant_id)
         if cached_result:
             logger.info("cache_hit tenant=%s", tenant_id)
             stub = ContextWindow(
-                query=query, tenant_id=tenant_id, chunks=cached_result.source_chunks
+                query=query,
+                tenant_id=tenant_id,
+                chunks=cached_result.source_chunks,
+                query_embedding=embedding,
             )
             asyncio.create_task(self._run_observers(stub, cached_result))
             yield cached_result.answer
             return
 
         try:
-            context = await self._build_context(query, tenant_id, conversation_id)
+            context = await self._build_context(
+                query, tenant_id, conversation_id, dense_vec, sparse_pairs
+            )
             full_answer: list[str] = []
             async for token in self._llm.generate_stream(context):
                 full_answer.append(token)
@@ -147,7 +164,9 @@ class QueryPipeline:
         )
 
         asyncio.create_task(self._run_observers(context, result))
-        asyncio.create_task(self._cache.set(cache_key, result, _CACHE_TTL_SECONDS))
+        asyncio.create_task(
+            self._cache.set(embedding, tenant_id, result, _CACHE_TTL_SECONDS)
+        )
         asyncio.create_task(self._save_turn(query, result.answer, conversation_id, tenant_id))
 
     async def _build_context(
@@ -155,13 +174,22 @@ class QueryPipeline:
         query: str,
         tenant_id: str,
         conversation_id: UUID,
+        dense_vec: list[list[float]],
+        sparse_pairs: list[tuple[list[int], list[float]]],
     ) -> ContextWindow:
-        """Embed query, retrieve chunks, rerank, load history — all in parallel where possible."""
+        """Retrieve chunks and rerank using pre-computed embeddings; load history in parallel."""
 
-        # embed + load history run concurrently — neither depends on the other
-        (dense_vec, sparse_pairs), recent_turns = await asyncio.gather(
-            self._embed_query(query),
+        async def _no_sources() -> list:
+            return []
+
+        source_coro = (
+            self._source_hash_repo.list_by_tenant(tenant_id)
+            if self._source_hash_repo
+            else _no_sources()
+        )
+        recent_turns, tenant_sources = await asyncio.gather(
             self._conversation_repo.get_recent_turns(conversation_id, limit=3),
+            source_coro,
         )
 
         sparse_indices, sparse_values = sparse_pairs[0]
@@ -176,12 +204,15 @@ class QueryPipeline:
 
         reranked = await self._reranker.rerank(query, chunks, top_n=_TOP_N_RERANK)
 
-        return self._context_builder.build(
+        context = self._context_builder.build(
             query=query,
             chunks=reranked,
             history=recent_turns,
             tenant_id=tenant_id,
         )
+        context.tenant_sources = tenant_sources
+        context.query_embedding = dense_vec[0]
+        return context
 
     async def _embed_query(
         self, query: str
@@ -218,9 +249,6 @@ class QueryPipeline:
             logger.warning("failed to save turn: %s", exc)
 
 
-def _cache_key(query: str, tenant_id: str) -> str:
-    raw = f"{tenant_id}:{query}".encode()
-    return f"cache:{hashlib.sha256(raw).hexdigest()}"
 
 
 

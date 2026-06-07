@@ -22,13 +22,13 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:7-alpine
+    image: redis/redis-stack-server:latest
     container_name: kapa_redis
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    command: redis-stack-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s

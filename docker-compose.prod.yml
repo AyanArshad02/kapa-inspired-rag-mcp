@@ -34,11 +34,11 @@ services:
       - kapa_net
 
   redis:
-    image: redis:7-alpine
+    image: redis/redis-stack-server:latest
     container_name: kapa_redis
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    command: redis-stack-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
     # No port binding — only reachable on the internal Docker network.
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
