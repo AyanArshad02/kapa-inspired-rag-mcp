@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import AsyncIterator
 from uuid import UUID
 
@@ -75,7 +76,12 @@ class QueryPipeline:
         conversation_id: UUID,
     ) -> QueryResult:
         """Run the full pipeline and return a complete (non-streamed) answer."""
+        t_start = time.perf_counter()
+
+        t0 = time.perf_counter()
         dense_vec, sparse_pairs = await self._embed_query(query)
+        embed_lat = time.perf_counter() - t0
+
         embedding = dense_vec[0]
 
         cached_result = await self._cache.get(embedding, tenant_id)
@@ -86,6 +92,7 @@ class QueryPipeline:
                 tenant_id=tenant_id,
                 chunks=cached_result.source_chunks,
                 query_embedding=embedding,
+                pipeline_started_at=t_start,
             )
             asyncio.create_task(self._run_observers(stub, cached_result))
             return cached_result
@@ -94,7 +101,11 @@ class QueryPipeline:
             context = await self._build_context(
                 query, tenant_id, conversation_id, dense_vec, sparse_pairs
             )
+            context.pipeline_stage_latencies["embed"] = embed_lat
+
+            t0 = time.perf_counter()
             result = await self._llm.generate(context)
+            context.pipeline_stage_latencies["generate"] = time.perf_counter() - t0
         except KapaError as exc:
             rag_errors_total.labels(
                 component=exc.component, error_type=exc.error_code.value
@@ -106,6 +117,7 @@ class QueryPipeline:
             raise
 
         result.conversation_id = conversation_id
+        context.pipeline_started_at = t_start
 
         asyncio.create_task(self._run_observers(context, result))
         asyncio.create_task(
@@ -122,7 +134,12 @@ class QueryPipeline:
         conversation_id: UUID,
     ) -> AsyncIterator[str]:
         """Stream answer tokens as they arrive. Used for SSE responses."""
+        t_start = time.perf_counter()
+
+        t0 = time.perf_counter()
         dense_vec, sparse_pairs = await self._embed_query(query)
+        embed_lat = time.perf_counter() - t0
+
         embedding = dense_vec[0]
 
         cached_result = await self._cache.get(embedding, tenant_id)
@@ -133,6 +150,7 @@ class QueryPipeline:
                 tenant_id=tenant_id,
                 chunks=cached_result.source_chunks,
                 query_embedding=embedding,
+                pipeline_started_at=t_start,
             )
             asyncio.create_task(self._run_observers(stub, cached_result))
             yield cached_result.answer
@@ -142,10 +160,14 @@ class QueryPipeline:
             context = await self._build_context(
                 query, tenant_id, conversation_id, dense_vec, sparse_pairs
             )
+            context.pipeline_stage_latencies["embed"] = embed_lat
+
+            t0 = time.perf_counter()
             full_answer: list[str] = []
             async for token in self._llm.generate_stream(context):
                 full_answer.append(token)
                 yield token
+            context.pipeline_stage_latencies["generate"] = time.perf_counter() - t0
         except KapaError as exc:
             rag_errors_total.labels(
                 component=exc.component, error_type=exc.error_code.value
@@ -162,6 +184,7 @@ class QueryPipeline:
             conversation_id=conversation_id,
             cached=False,
         )
+        context.pipeline_started_at = t_start
 
         asyncio.create_task(self._run_observers(context, result))
         asyncio.create_task(
@@ -194,6 +217,7 @@ class QueryPipeline:
 
         sparse_indices, sparse_values = sparse_pairs[0]
 
+        t0 = time.perf_counter()
         chunks = await self._vector_db.hybrid_search(
             tenant_id=tenant_id,
             dense_vector=dense_vec[0],
@@ -201,8 +225,11 @@ class QueryPipeline:
             sparse_values=sparse_values,
             top_k=_TOP_K_RETRIEVAL,
         )
+        retrieve_lat = time.perf_counter() - t0
 
+        t0 = time.perf_counter()
         reranked = await self._reranker.rerank(query, chunks, top_n=_TOP_N_RERANK)
+        rerank_lat = time.perf_counter() - t0
 
         context = self._context_builder.build(
             query=query,
@@ -212,6 +239,10 @@ class QueryPipeline:
         )
         context.tenant_sources = tenant_sources
         context.query_embedding = dense_vec[0]
+        context.pipeline_stage_latencies["retrieve"] = retrieve_lat
+        context.pipeline_stage_latencies["rerank"] = rerank_lat
+        if reranked and reranked[0].rerank_score is not None:
+            context.top_retrieval_score = reranked[0].rerank_score
         return context
 
     async def _embed_query(
