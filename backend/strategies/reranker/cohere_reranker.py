@@ -45,7 +45,12 @@ class CohereReranker(RerankerStrategy):
                         documents=[c.content for c in chunks],
                         top_n=min(top_n, len(chunks)),
                     )
-                    return [chunks[r.index] for r in response.results]
+                    result_chunks = []
+                    for r in response.results:
+                        chunk = chunks[r.index]
+                        chunk.rerank_score = r.relevance_score
+                        result_chunks.append(chunk)
+                    return result_chunks
                 except Exception as exc:
                     msg = str(exc).lower()
                     if "timeout" in msg or "timed out" in msg:
