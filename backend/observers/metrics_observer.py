@@ -3,9 +3,9 @@ from __future__ import annotations
 import time
 
 from prometheus_client import Counter, Histogram
+
 from backend.models import ContextWindow, QueryResult
 from backend.observers.base import QueryObserver
-
 
 _query_latency = Histogram(
     "rag_query_latency_seconds",
