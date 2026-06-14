@@ -65,6 +65,18 @@ rate_limit_hits_total = Counter(
     ["tenant_id"],
 )
 
+_tokens_in_total = Counter(
+    "rag_tokens_in_total",
+    "Cumulative LLM input (prompt) tokens per tenant — cache hits excluded",
+    ["tenant_id"],
+)
+
+_tokens_out_total = Counter(
+    "rag_tokens_out_total",
+    "Cumulative LLM output (completion) tokens per tenant — cache hits excluded",
+    ["tenant_id"],
+)
+
 
 class MetricsObserver(QueryObserver):
     """
@@ -106,3 +118,8 @@ class MetricsObserver(QueryObserver):
         # Per-stage latency breakdown (embed / retrieve / rerank / generate)
         for stage, latency in context.pipeline_stage_latencies.items():
             _stage_latency.labels(tenant_id=tenant, stage=stage).observe(latency)
+
+        # LLM token consumption — only present when LLM was actually called
+        if context.tokens_in > 0:
+            _tokens_in_total.labels(tenant_id=tenant).inc(context.tokens_in)
+            _tokens_out_total.labels(tenant_id=tenant).inc(context.tokens_out)
