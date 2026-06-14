@@ -5,6 +5,8 @@ import logging
 import os as _os
 from uuid import UUID, uuid4
 
+from decimal import Decimal
+
 import asyncpg
 import redis.asyncio as aioredis
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -22,6 +24,7 @@ from backend.core.query_pipeline import QueryPipeline
 from backend.observers.cache_observer import CacheObserver
 from backend.observers.metrics_observer import MetricsObserver
 from backend.observers.trace_observer import TraceObserver
+from backend.observers.usage_observer import UsageObserver
 from backend.repositories.postgres_conversation_repo import PostgresConversationRepository
 from backend.repositories.postgres_source_hash_repo import PostgresSourceHashRepository
 from backend.strategies.cache.redis_semantic_cache import RedisSemanticCache
@@ -84,6 +87,7 @@ async def startup() -> None:
             CacheObserver(cache, ttl_seconds=settings.cache_ttl_seconds),
             TraceObserver(),
             MetricsObserver(),
+            UsageObserver(pool),
         ],
         source_hash_repo=PostgresSourceHashRepository(pool),
     )
@@ -168,6 +172,43 @@ async def get_conversation_messages(
     """Return all messages for a conversation as [{role, content}]."""
     pipeline: QueryPipeline = app.state.pipeline
     return await pipeline._conversation_repo.get_messages(conversation_id, tenant_id)
+
+
+@app.get("/usage")
+async def get_usage(
+    tenant_id: str = Depends(get_tenant_id),
+    days: int = 30,
+) -> dict:
+    """Return token consumption and estimated cost for this tenant.
+
+    Defaults to the last 30 days. Pass ?days=7 for a weekly view.
+    Cache hits are excluded — only LLM calls are counted.
+    """
+    async with app.state.db_pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT "
+            "  COUNT(*)       AS total_queries, "
+            "  SUM(tokens_in) AS total_in, "
+            "  SUM(tokens_out) AS total_out, "
+            "  SUM(cost_usd)  AS total_cost "
+            "FROM usage_records "
+            "WHERE tenant_id = $1 "
+            "  AND created_at > NOW() - ($2 * INTERVAL '1 day')",
+            UUID(tenant_id),
+            days,
+        )
+    total_in  = int(row["total_in"]  or 0)
+    total_out = int(row["total_out"] or 0)
+    total_cost = Decimal(row["total_cost"] or 0)
+    return {
+        "tenant_id":     tenant_id,
+        "period_days":   days,
+        "total_queries": int(row["total_queries"] or 0),
+        "tokens_in":     total_in,
+        "tokens_out":    total_out,
+        "tokens_total":  total_in + total_out,
+        "cost_usd":      f"{total_cost:.8f}",
+    }
 
 
 @app.get("/health")
