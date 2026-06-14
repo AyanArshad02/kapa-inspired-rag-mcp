@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     top_n_rerank: int = 5
     max_context_tokens: int = 6000
     cache_ttl_seconds: int = 3600
+    rate_limit_per_minute: int = 20
 
     service_port: int = 8000
 

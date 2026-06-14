@@ -6,7 +6,8 @@ import os as _os
 from uuid import UUID, uuid4
 
 import asyncpg
-from fastapi import Depends, FastAPI, HTTPException
+import redis.asyncio as aioredis
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
@@ -14,6 +15,7 @@ from pydantic import BaseModel
 from starlette.responses import Response as _PrometheusResponse
 
 from backend.api.admin_service import router as admin_router
+from backend.api.dependencies import rate_limit
 from backend.api.middleware.auth import get_tenant_id
 from backend.config import settings
 from backend.core.query_pipeline import QueryPipeline
@@ -59,6 +61,8 @@ async def startup() -> None:
     from backend.logging import LogSetupFactory
     LogSetupFactory.create(settings.environment).configure("query")
 
+    app.state.redis = aioredis.from_url(settings.redis_url, decode_responses=False)
+
     pool = await asyncpg.create_pool(settings.postgres_url.replace("+asyncpg", ""))
     app.state.db_pool = pool
 
@@ -88,6 +92,7 @@ async def startup() -> None:
 @app.on_event("shutdown")
 async def shutdown() -> None:
     await app.state.db_pool.close()
+    await app.state.redis.aclose()
 
 
 # ── Request / Response models ─────────────────────────────────────────────────
@@ -105,9 +110,9 @@ class QueryResponse(BaseModel):
     cached: bool
 
 
-# ── Endpoints ─────────────────────────────────────────────────────────────────
+# ── Endpoints ──────────────────────────────────────────────────────────────────
 
-@app.post("/query")
+@app.post("/query", dependencies=[Depends(rate_limit)])
 async def handle_query(
     body: QueryRequest,
     tenant_id: str = Depends(get_tenant_id),

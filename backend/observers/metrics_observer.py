@@ -59,6 +59,12 @@ _source_chunks = Histogram(
     buckets=[1, 2, 3, 4, 5],
 )
 
+rate_limit_hits_total = Counter(
+    "rag_rate_limit_hits_total",
+    "Requests rejected due to per-tenant sliding-window rate limiting",
+    ["tenant_id"],
+)
+
 
 class MetricsObserver(QueryObserver):
     """
