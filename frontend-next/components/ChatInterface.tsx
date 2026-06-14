@@ -2,7 +2,7 @@
 
 import { type FormEvent, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
-import { queryApi } from '@/lib/api'
+import { formatSourceUrl, queryApi } from '@/lib/api'
 
 export interface ChatMessage {
   role: 'user' | 'assistant'
@@ -123,7 +123,7 @@ export default function ChatInterface({
                     <ul className="mt-1 space-y-0.5 pl-1">
                       {msg.sources.map((s, j) => (
                         <li key={j} className="text-xs truncate text-gray-500" title={s}>
-                          {s}
+                          {formatSourceUrl(s)}
                         </li>
                       ))}
                     </ul>
