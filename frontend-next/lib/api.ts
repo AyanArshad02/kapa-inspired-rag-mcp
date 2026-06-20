@@ -125,14 +125,31 @@ export async function ingestUrlApi(sourceUrl: string, sourceType: string): Promi
 }
 
 export async function uploadFileApi(file: File): Promise<{ job_id: string }> {
-  const form = new FormData()
-  form.append('file', file)
-  const res = await authFetch(`${INGESTION_URL}/ingest/upload`, {
+  // Step 1 — ask backend for a presigned S3 PUT URL
+  const presignRes = await authFetch(`${INGESTION_URL}/ingest/presign`, {
     method: 'POST',
-    body: form,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename: file.name, content_type: file.type }),
   })
-  if (!res.ok) throw new Error(`Upload failed (${res.status}): ${await res.text()}`)
-  return res.json()
+  if (!presignRes.ok) throw new Error(`Presign failed (${presignRes.status}): ${await presignRes.text()}`)
+  const { presigned_url, s3_url } = await presignRes.json()
+
+  // Step 2 — PUT file bytes directly to S3 (no auth header — presigned URL is self-contained)
+  const s3Res = await fetch(presigned_url, {
+    method: 'PUT',
+    headers: { 'Content-Type': file.type },
+    body: file,
+  })
+  if (!s3Res.ok) throw new Error(`S3 upload failed (${s3Res.status})`)
+
+  // Step 3 — tell backend the file is in S3, start ingestion job
+  const confirmRes = await authFetch(`${INGESTION_URL}/ingest/confirm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ s3_url }),
+  })
+  if (!confirmRes.ok) throw new Error(`Confirm failed (${confirmRes.status}): ${await confirmRes.text()}`)
+  return confirmRes.json()
 }
 
 export async function deleteSourceApi(sourceUrl: string): Promise<void> {
@@ -191,7 +208,50 @@ export async function queryApi(query: string, conversationId: string | null): Pr
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query, stream: false, conversation_id: conversationId }),
   })
+  if (res.status === 429) {
+    throw new Error('Rate limit reached — you can send 20 requests per minute. Please wait 60 seconds and try again.')
+  }
   if (!res.ok) throw new Error(`Query failed (${res.status}): ${await res.text()}`)
+  return res.json()
+}
+
+// ── Display helpers ───────────────────────────────────────────────────────────
+
+/**
+ * Returns a human-readable label for a source URL.
+ *   s3://bucket/tenant/My File_abc123def.pdf  →  "My File.pdf"
+ *   https://fastapi.tiangolo.com/tutorial/     →  "fastapi.tiangolo.com/tutorial"
+ */
+export function formatSourceUrl(url: string): string {
+  if (url.startsWith('s3://')) {
+    const filename = url.split('/').filter(Boolean).pop() ?? url
+    // Strip the upload hash suffix appended by S3Storage: "name_<32 hex chars>.ext" → "name.ext"
+    return filename.replace(/_[a-f0-9]{32}(\.[^.]+)$/, '$1')
+  }
+  try {
+    const { hostname, pathname } = new URL(url)
+    const path = pathname.replace(/\/$/, '')
+    return path ? `${hostname}${path}` : hostname
+  } catch {
+    return url
+  }
+}
+
+// ── Usage ─────────────────────────────────────────────────────────────────────
+
+export interface UsageStats {
+  tenant_id: string
+  period_days: number
+  total_queries: number
+  tokens_in: number
+  tokens_out: number
+  tokens_total: number
+  cost_usd: string
+}
+
+export async function getUsageApi(days: number = 30): Promise<UsageStats> {
+  const res = await authFetch(`${QUERY_URL}/usage?days=${days}`)
+  if (!res.ok) throw new Error('Failed to load usage stats')
   return res.json()
 }
 
@@ -205,10 +265,13 @@ export interface AdminTenant {
   source_count: number
   conversation_count: number
   query_count: number
+  tokens_in: number
+  tokens_out: number
+  cost_usd: string
 }
 
 export interface AdminOverview {
-  totals: { tenants: number; users: number; sources: number; queries: number }
+  totals: { tenants: number; users: number; sources: number; queries: number; tokens_in: number; tokens_out: number }
   tenants: AdminTenant[]
   recent_queries: { content: string; tenant_name: string; created_at: string }[]
   sources_by_type: { type: string; count: number }[]

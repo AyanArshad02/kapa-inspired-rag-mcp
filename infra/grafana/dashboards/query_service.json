@@ -4,36 +4,59 @@
   "schemaVersion": 38,
   "version": 1,
   "refresh": "15s",
-  "time": { "from": "now-1h", "to": "now" },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
   "templating": {
     "list": [
       {
         "name": "tenant_id",
         "type": "query",
-        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
         "definition": "label_values(rag_queries_total, tenant_id)",
         "query": "label_values(rag_queries_total, tenant_id)",
         "includeAll": true,
         "multi": true,
-        "current": { "selected": true, "text": "All", "value": "$__all" }
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        }
       }
     ]
   },
   "panels": [
     {
       "id": 1,
-      "title": "Query Latency — p50 / p95 / p99",
+      "title": "Query Latency \u2014 p50 / p95 / p99",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "custom": { "lineWidth": 2 }
+          "custom": {
+            "lineWidth": 2
+          }
         }
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
       },
       "targets": [
         {
@@ -54,14 +77,24 @@
       "id": 2,
       "title": "Cache Hit Rate",
       "type": "timeseries",
-      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
           "min": 0,
           "max": 1,
-          "custom": { "lineWidth": 2 }
+          "custom": {
+            "lineWidth": 2
+          }
         }
       },
       "targets": [
@@ -75,12 +108,22 @@
       "id": 3,
       "title": "Queries Per Second (QPS)",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 8, "w": 8, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
-          "custom": { "lineWidth": 2 }
+          "custom": {
+            "lineWidth": 2
+          }
         }
       },
       "targets": [
@@ -94,16 +137,29 @@
       "id": 4,
       "title": "Per-Stage Latency p95 (embed / retrieve / rerank / generate)",
       "type": "timeseries",
-      "gridPos": { "x": 8, "y": 8, "w": 16, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": {
+        "x": 8,
+        "y": 8,
+        "w": 16,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "custom": { "lineWidth": 2 }
+          "custom": {
+            "lineWidth": 2
+          }
         }
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
       },
       "targets": [
         {
@@ -116,20 +172,30 @@
       "id": 5,
       "title": "Top Retrieval Score (avg Cohere relevance)",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "short",
           "min": 0,
           "max": 1,
-          "custom": { "lineWidth": 2 }
+          "custom": {
+            "lineWidth": 2
+          }
         }
       },
       "targets": [
         {
           "expr": "sum(rate(rag_retrieval_score_sum{tenant_id=~\"$tenant_id\"}[5m])) by (tenant_id) / sum(rate(rag_retrieval_score_count{tenant_id=~\"$tenant_id\"}[5m])) by (tenant_id)",
-          "legendFormat": "avg score — {{tenant_id}}"
+          "legendFormat": "avg score \u2014 {{tenant_id}}"
         }
       ]
     },
@@ -137,12 +203,22 @@
       "id": 6,
       "title": "LLM Context Window Size (tokens, p95)",
       "type": "timeseries",
-      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "custom": { "lineWidth": 2 }
+          "custom": {
+            "lineWidth": 2
+          }
         }
       },
       "targets": [
@@ -153,6 +229,144 @@
         {
           "expr": "histogram_quantile(0.50, sum(rate(rag_query_tokens_bucket[5m])) by (le))",
           "legendFormat": "p50 tokens"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Token Throughput (tokens/min)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2
+          }
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(rag_tokens_in_total{tenant_id=~\"$tenant_id\"}[5m])) * 60",
+          "legendFormat": "input tokens/min"
+        },
+        {
+          "expr": "sum(rate(rag_tokens_out_total{tenant_id=~\"$tenant_id\"}[5m])) * 60",
+          "legendFormat": "output tokens/min"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Cumulative Tokens",
+      "type": "stat",
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(rag_tokens_in_total{tenant_id=~\"$tenant_id\"})",
+          "legendFormat": "Total Input Tokens"
+        },
+        {
+          "expr": "sum(rag_tokens_out_total{tenant_id=~\"$tenant_id\"})",
+          "legendFormat": "Total Output Tokens"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Tokens by Tenant (Input vs Output)",
+      "type": "bargauge",
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "expr": "sum by(tenant_id)(rag_tokens_in_total)",
+          "legendFormat": "Input \u2014 {{tenant_id}}"
+        },
+        {
+          "expr": "sum by(tenant_id)(rag_tokens_out_total)",
+          "legendFormat": "Output \u2014 {{tenant_id}}"
         }
       ]
     }

@@ -54,6 +54,29 @@ class S3Storage:
         logger.info("s3: uploaded %s → %s", filename, s3_url)
         return s3_url
 
+    def presign_upload(
+        self, tenant_id: str, filename: str, expires_in: int = 300
+    ) -> tuple[str, str]:
+        """Generate a presigned PUT URL for direct browser-to-S3 upload.
+
+        Returns (presigned_url, s3_url).  The caller should:
+          1. PUT the file bytes directly to presigned_url from the browser.
+          2. POST the returned s3_url to /ingest/confirm to start processing.
+        """
+        suffix = Path(filename).suffix.lower()
+        stem = Path(filename).stem
+        key = f"{tenant_id}/{stem}_{uuid.uuid4().hex}{suffix}"
+        content_type = _content_type(suffix)
+
+        presigned_url = self._s3.generate_presigned_url(
+            "put_object",
+            Params={"Bucket": self._bucket, "Key": key, "ContentType": content_type},
+            ExpiresIn=expires_in,
+        )
+        s3_url = f"{_S3_SCHEME}{self._bucket}/{key}"
+        logger.info("s3: presigned PUT for %s → %s", filename, s3_url)
+        return presigned_url, s3_url
+
     async def download(self, s3_url: str) -> bytes:
         """Download and return raw bytes for an s3:// URL."""
         bucket, key = _parse_s3_url(s3_url)

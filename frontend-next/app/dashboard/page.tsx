@@ -8,9 +8,10 @@ import AddSourcePanel from '@/components/AddSourcePanel'
 import ChatInterface, { type ChatMessage } from '@/components/ChatInterface'
 import SourceList from '@/components/SourceList'
 import PreviousChats from '@/components/PreviousChats'
+import UsagePanel from '@/components/UsagePanel'
 import { getConversationMessagesApi } from '@/lib/api'
 
-type SidebarTab = 'chats' | 'sources'
+type SidebarTab = 'chats' | 'sources' | 'usage'
 
 export default function DashboardPage() {
   const { user, loading, logout } = useAuth()
@@ -85,26 +86,19 @@ export default function DashboardPage() {
         <aside className="w-64 bg-white border-r border-gray-200 flex flex-col shrink-0">
           {/* Tab switcher */}
           <div className="flex border-b border-gray-200 shrink-0">
-            <button
-              onClick={() => setTab('chats')}
-              className={`flex-1 py-3 text-xs font-semibold tracking-wide transition-colors ${
-                tab === 'chats'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-400 hover:text-gray-600'
-              }`}
-            >
-              CHATS
-            </button>
-            <button
-              onClick={() => setTab('sources')}
-              className={`flex-1 py-3 text-xs font-semibold tracking-wide transition-colors ${
-                tab === 'sources'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-400 hover:text-gray-600'
-              }`}
-            >
-              SOURCES
-            </button>
+            {(['chats', 'sources', 'usage'] as SidebarTab[]).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`flex-1 py-3 text-xs font-semibold tracking-wide transition-colors ${
+                  tab === t
+                    ? 'text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-400 hover:text-gray-600'
+                }`}
+              >
+                {t.toUpperCase()}
+              </button>
+            ))}
           </div>
 
           {/* Tab content */}
@@ -132,6 +126,8 @@ export default function DashboardPage() {
                 <SourceList refreshKey={sourceRefreshKey} />
               </div>
             )}
+
+            {tab === 'usage' && <UsagePanel />}
           </div>
         </aside>
 

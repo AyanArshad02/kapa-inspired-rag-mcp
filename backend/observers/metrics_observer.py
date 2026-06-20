@@ -3,9 +3,9 @@ from __future__ import annotations
 import time
 
 from prometheus_client import Counter, Histogram
+
 from backend.models import ContextWindow, QueryResult
 from backend.observers.base import QueryObserver
-
 
 _query_latency = Histogram(
     "rag_query_latency_seconds",
@@ -59,6 +59,24 @@ _source_chunks = Histogram(
     buckets=[1, 2, 3, 4, 5],
 )
 
+rate_limit_hits_total = Counter(
+    "rag_rate_limit_hits_total",
+    "Requests rejected due to per-tenant sliding-window rate limiting",
+    ["tenant_id"],
+)
+
+_tokens_in_total = Counter(
+    "rag_tokens_in_total",
+    "Cumulative LLM input (prompt) tokens per tenant — cache hits excluded",
+    ["tenant_id"],
+)
+
+_tokens_out_total = Counter(
+    "rag_tokens_out_total",
+    "Cumulative LLM output (completion) tokens per tenant — cache hits excluded",
+    ["tenant_id"],
+)
+
 
 class MetricsObserver(QueryObserver):
     """
@@ -100,3 +118,8 @@ class MetricsObserver(QueryObserver):
         # Per-stage latency breakdown (embed / retrieve / rerank / generate)
         for stage, latency in context.pipeline_stage_latencies.items():
             _stage_latency.labels(tenant_id=tenant, stage=stage).observe(latency)
+
+        # LLM token consumption — only present when LLM was actually called
+        if context.tokens_in > 0:
+            _tokens_in_total.labels(tenant_id=tenant).inc(context.tokens_in)
+            _tokens_out_total.labels(tenant_id=tenant).inc(context.tokens_out)

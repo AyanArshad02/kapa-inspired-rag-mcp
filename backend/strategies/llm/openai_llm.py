@@ -6,6 +6,7 @@ from openai import APIError, APITimeoutError, AsyncOpenAI, RateLimitError
 
 from backend.config import settings
 from backend.core.circuit_breaker import CircuitBreaker, CircuitOpenError
+from backend.core.pricing import get_cost
 from backend.exceptions import LLMInvalidResponseError, LLMRateLimitError, LLMTimeoutError
 from backend.models import ContextWindow, QueryResult
 from backend.strategies.base import LLMStrategy
@@ -49,6 +50,11 @@ class OpenAILLM(LLMStrategy):
         except APIError as exc:
             raise LLMInvalidResponseError(str(exc)) from exc
 
+        if response.usage:
+            context.tokens_in = response.usage.prompt_tokens
+            context.tokens_out = response.usage.completion_tokens
+            context.cost_usd = get_cost(model, context.tokens_in, context.tokens_out)
+
         return QueryResult(
             answer=response.choices[0].message.content or "",
             source_chunks=context.chunks,
@@ -67,6 +73,7 @@ class OpenAILLM(LLMStrategy):
                 temperature=0.1,
                 max_tokens=1024,
                 stream=True,
+                stream_options={"include_usage": True},
             )
         except CircuitOpenError as exc:
             raise LLMTimeoutError("LLM circuit open — too many recent failures") from exc
@@ -79,8 +86,13 @@ class OpenAILLM(LLMStrategy):
 
         try:
             async for chunk in stream:
-                token = chunk.choices[0].delta.content
-                if token:
-                    yield token
+                if chunk.usage:
+                    context.tokens_in = chunk.usage.prompt_tokens
+                    context.tokens_out = chunk.usage.completion_tokens
+                    context.cost_usd = get_cost(
+                        model, context.tokens_in, context.tokens_out
+                    )
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
         except APIError as exc:
             raise LLMInvalidResponseError(f"Stream interrupted: {exc}") from exc

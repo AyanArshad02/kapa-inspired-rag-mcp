@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal
 from enum import StrEnum
 from typing import Any
 from uuid import UUID, uuid4
@@ -91,6 +92,9 @@ class ContextWindow:
     top_retrieval_score: float = 0.0
     pipeline_stage_latencies: dict[str, float] = field(default_factory=dict)
     pipeline_started_at: float = 0.0
+    tokens_in: int = 0
+    tokens_out: int = 0
+    cost_usd: Decimal = field(default_factory=lambda: Decimal("0"))
 
 
 @dataclass

@@ -64,16 +64,18 @@ export default function AdminPage() {
         {/* Totals */}
         <section>
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Overview</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {[
-              { label: 'Tenants', value: data.totals.tenants },
-              { label: 'Users', value: data.totals.users },
-              { label: 'Sources', value: data.totals.sources },
-              { label: 'Total Queries', value: data.totals.queries },
+              { label: 'Tenants', value: data.totals.tenants.toLocaleString() },
+              { label: 'Users', value: data.totals.users.toLocaleString() },
+              { label: 'Sources', value: data.totals.sources.toLocaleString() },
+              { label: 'Total Queries', value: data.totals.queries.toLocaleString() },
+              { label: 'Tokens In (30d)', value: data.totals.tokens_in.toLocaleString() },
+              { label: 'Tokens Out (30d)', value: data.totals.tokens_out.toLocaleString() },
             ].map((stat) => (
               <div key={stat.label} className="bg-white rounded-xl border border-gray-200 p-5">
                 <p className="text-sm text-gray-500">{stat.label}</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">{stat.value}</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{stat.value}</p>
               </div>
             ))}
           </div>
@@ -102,7 +104,7 @@ export default function AdminPage() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  {['Email', 'Sources', 'Conversations', 'Queries', 'Role'].map((h) => (
+                  {['Email', 'Sources', 'Conversations', 'Queries', 'Tokens In', 'Tokens Out', 'Cost (30d)', 'Role'].map((h) => (
                     <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
                       {h}
                     </th>
@@ -115,7 +117,10 @@ export default function AdminPage() {
                     <td className="px-4 py-3 text-gray-900 font-medium">{t.email ?? '—'}</td>
                     <td className="px-4 py-3 text-gray-600">{t.source_count}</td>
                     <td className="px-4 py-3 text-gray-600">{t.conversation_count}</td>
-                    <td className="px-4 py-3 font-semibold text-blue-600">{t.query_count}</td>
+                    <td className="px-4 py-3 font-semibold text-blue-600">{t.query_count.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-gray-600 tabular-nums">{t.tokens_in.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-gray-600 tabular-nums">{t.tokens_out.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-gray-600 tabular-nums">${t.cost_usd}</td>
                     <td className="px-4 py-3">
                       {t.is_admin
                         ? <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">Admin</span>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { deleteSourceApi, listSourcesApi, type Source } from '@/lib/api'
+import { deleteSourceApi, formatSourceUrl, listSourcesApi, type Source } from '@/lib/api'
 
 function sourceIcon(type: string) {
   if (type === 'pdf') return '📄'
@@ -12,6 +12,7 @@ function sourceIcon(type: string) {
 export default function SourceList({ refreshKey }: { refreshKey: number }) {
   const [sources, setSources] = useState<Source[]>([])
   const [loading, setLoading] = useState(true)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -29,11 +30,13 @@ export default function SourceList({ refreshKey }: { refreshKey: number }) {
   }, [load, refreshKey])
 
   async function handleDelete(url: string) {
+    setDeleteError(null)
     try {
       await deleteSourceApi(url)
       setSources((prev) => prev.filter((s) => s.source_url !== url))
     } catch {
-      alert('Delete failed')
+      setDeleteError('Delete failed — please try again.')
+      setTimeout(() => setDeleteError(null), 4000)
     }
   }
 
@@ -56,19 +59,23 @@ export default function SourceList({ refreshKey }: { refreshKey: number }) {
         </button>
       </div>
 
+      {deleteError && (
+        <p className="text-xs text-red-500 py-1">{deleteError}</p>
+      )}
+
       {sources.length === 0 ? (
         <p className="text-xs text-gray-400 py-2">No sources indexed yet.</p>
       ) : (
         <ul className="space-y-1">
           {sources.map((src) => {
-            const name = src.source_url.split('/').filter(Boolean).pop() ?? src.source_url
-            const short = name.length > 28 ? name.slice(0, 28) + '…' : name
+            const label = formatSourceUrl(src.source_url)
+            const short = label.length > 28 ? label.slice(0, 28) + '…' : label
             return (
               <li
                 key={src.source_url}
                 className="flex items-center justify-between group py-0.5"
               >
-                <span className="text-xs text-gray-600 truncate" title={src.source_url}>
+                <span className="text-xs text-gray-600 truncate" title={label}>
                   {sourceIcon(src.source_type)} {short}
                 </span>
                 <button

@@ -92,3 +92,18 @@ CREATE TABLE IF NOT EXISTS webhook_secrets (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- usage_records: one row per LLM call. Tracks token consumption and estimated
+-- cost per tenant. Cache hits are excluded (no LLM call = no record).
+CREATE TABLE IF NOT EXISTS usage_records (
+    id              BIGSERIAL   PRIMARY KEY,
+    tenant_id       UUID        NOT NULL REFERENCES tenants(tenant_id),
+    conversation_id UUID,
+    tokens_in       INTEGER     NOT NULL DEFAULT 0,
+    tokens_out      INTEGER     NOT NULL DEFAULT 0,
+    cost_usd        NUMERIC(12, 8) NOT NULL DEFAULT 0,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_usage_records_tenant_created
+    ON usage_records (tenant_id, created_at DESC);
