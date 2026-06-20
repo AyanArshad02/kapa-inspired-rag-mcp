@@ -22,12 +22,12 @@
 
 **Frontend:** [http://54.156.190.134:3001](http://54.156.190.134:3001) — sign up (or use guest login), ingest a GitHub repo or docs URL, ask questions, chat history persists across sessions.
 
-| Service | URL |
-| --- | --- |
-| Next.js frontend | [http://54.156.190.134:3001](http://54.156.190.134:3001) |
-| Query API (Swagger) | [http://54.156.190.134:9000/docs](http://54.156.190.134:9000/docs) |
+| Service                 | URL                                                             |
+| ----------------------- | --------------------------------------------------------------- |
+| Next.js frontend        | [http://54.156.190.134:3001](http://54.156.190.134:3001)           |
+| Query API (Swagger)     | [http://54.156.190.134:9000/docs](http://54.156.190.134:9000/docs) |
 | Ingestion API (Swagger) | [http://54.156.190.134:9001/docs](http://54.156.190.134:9001/docs) |
-| Auth API (Swagger) | [http://54.156.190.134:8004/docs](http://54.156.190.134:8004/docs) |
+| Auth API (Swagger)      | [http://54.156.190.134:8004/docs](http://54.156.190.134:8004/docs) |
 
 ---
 
@@ -55,8 +55,8 @@ Most RAG tutorials stop at "chunk → embed → retrieve → generate." This pro
 
 Evaluated on **78 Q&A pairs** generated from real FastAPI + Supabase documentation.
 
-| Metric            | Score     | Gate   | Status |
-| ----------------- | --------- | ------ | ------ |
+| Metric            | Score           | Gate    | Status |
+| ----------------- | --------------- | ------- | ------ |
 | Faithfulness      | **0.908** | ≥ 0.85 | ✅     |
 | Answer Relevancy  | **0.832** | ≥ 0.80 | ✅     |
 | Context Precision | **0.892** | ≥ 0.85 | ✅     |
@@ -111,11 +111,11 @@ See full experiment analysis in [experiments/](experiments/) and decision ration
 
 ### 3-Layer Design
 
-| Layer                     | What                                     | Why                                                 |
-| ------------------------- | ---------------------------------------- | --------------------------------------------------- |
-| **A** — Orchestrators     | `QueryPipeline`, `IngestionPipeline`     | Business logic lives here; no infra imports         |
-| **B** — Interfaces        | `LLMStrategy`, `VectorDB`, etc.          | Swap implementations without touching orchestrators |
-| **C** — Implementations   | `OpenAILLM`, `QdrantDB`, etc.            | All infra and API calls isolated here               |
+| Layer                          | What                                     | Why                                                 |
+| ------------------------------ | ---------------------------------------- | --------------------------------------------------- |
+| **A** — Orchestrators   | `QueryPipeline`, `IngestionPipeline` | Business logic lives here; no infra imports         |
+| **B** — Interfaces      | `LLMStrategy`, `VectorDB`, etc.      | Swap implementations without touching orchestrators |
+| **C** — Implementations | `OpenAILLM`, `QdrantDB`, etc.        | All infra and API calls isolated here               |
 
 ---
 
@@ -123,18 +123,18 @@ See full experiment analysis in [experiments/](experiments/) and decision ration
 
 | Service               | Port (local) | Port (prod) | Description                                       |
 | --------------------- | ------------ | ----------- | ------------------------------------------------- |
-| `auth-service`        | 8004         | 8004        | JWT signup/login/refresh/guest, tenant + RBAC     |
-| `query-service`       | 8000         | 9000        | RAG query, SSE streaming, conversation history    |
-| `ingestion-service`   | 8001         | 9001        | URL/file/GitHub ingestion, job tracking           |
-| `celery-worker`       | —            | —           | Async ingestion task processing                   |
-| `celery-beat`         | —            | —           | Scheduled re-ingestion tasks                      |
-| `webhook-service`     | 8003         | 8003        | GitHub push webhook → auto re-ingest              |
-| `frontend`            | 3001         | 3001        | Next.js 14 App Router, chat UI, admin dashboard   |
-| `postgres`            | 5432         | internal    | Users, tenants, RBAC roles, conversations, jobs   |
-| `qdrant`              | 6333         | internal    | Vector storage (per-tenant collections)           |
-| `redis`               | 6379         | internal    | Semantic cache (Redis Stack) + Celery broker      |
-| `prometheus`          | 9090         | —           | Metrics scrape (prod: add on t3.medium+)          |
-| `grafana`             | 3000         | —           | Auto-provisioned RAG dashboard (prod: t3.medium+) |
+| `auth-service`      | 8004         | 8004        | JWT signup/login/refresh/guest, tenant + RBAC     |
+| `query-service`     | 8000         | 9000        | RAG query, SSE streaming, conversation history    |
+| `ingestion-service` | 8001         | 9001        | URL/file/GitHub ingestion, job tracking           |
+| `celery-worker`     | —           | —          | Async ingestion task processing                   |
+| `celery-beat`       | —           | —          | Scheduled re-ingestion tasks                      |
+| `webhook-service`   | 8003         | 8003        | GitHub push webhook → auto re-ingest             |
+| `frontend`          | 3001         | 3001        | Next.js 14 App Router, chat UI, admin dashboard   |
+| `postgres`          | 5432         | internal    | Users, tenants, RBAC roles, conversations, jobs   |
+| `qdrant`            | 6333         | internal    | Vector storage (per-tenant collections)           |
+| `redis`             | 6379         | internal    | Semantic cache (Redis Stack) + Celery broker      |
+| `prometheus`        | 9090         | —          | Metrics scrape (prod: add on t3.medium+)          |
+| `grafana`           | 3000         | —          | Auto-provisioned RAG dashboard (prod: t3.medium+) |
 
 ---
 
@@ -230,33 +230,72 @@ Prometheus metrics are emitted after every query via a fire-and-forget observer.
 
 ### Prometheus Metrics
 
-| Metric | Type | Labels | What it measures |
-| --- | --- | --- | --- |
-| `rag_queries_total` | Counter | `tenant_id`, `cached` | Total queries (split by cache hit/miss) |
-| `rag_query_latency_seconds` | Histogram | `tenant_id` | End-to-end latency (cache hit or full pipeline) |
-| `rag_cache_hits_total` | Counter | `tenant_id` | Queries served from semantic cache |
-| `rag_cache_misses_total` | Counter | `tenant_id` | Queries that ran the full pipeline |
-| `rag_pipeline_stage_latency_seconds` | Histogram | `tenant_id`, `stage` | Per-stage: embed / retrieve / rerank / generate |
-| `rag_retrieval_score` | Histogram | `tenant_id` | Cohere relevance score of top-1 reranked chunk |
-| `rag_query_tokens` | Histogram | — | Context window token count (full pipeline only) |
-| `rag_source_chunks_returned` | Histogram | — | Number of source chunks in the answer |
+| Metric                                 | Type      | Labels                    | What it measures                                |
+| -------------------------------------- | --------- | ------------------------- | ----------------------------------------------- |
+| `rag_queries_total`                  | Counter   | `tenant_id`, `cached` | Total queries (split by cache hit/miss)         |
+| `rag_query_latency_seconds`          | Histogram | `tenant_id`             | End-to-end latency (cache hit or full pipeline) |
+| `rag_cache_hits_total`               | Counter   | `tenant_id`             | Queries served from semantic cache              |
+| `rag_cache_misses_total`             | Counter   | `tenant_id`             | Queries that ran the full pipeline              |
+| `rag_pipeline_stage_latency_seconds` | Histogram | `tenant_id`, `stage`  | Per-stage: embed / retrieve / rerank / generate |
+| `rag_retrieval_score`                | Histogram | `tenant_id`             | Cohere relevance score of top-1 reranked chunk  |
+| `rag_query_tokens`                   | Histogram | —                        | Context window token count (full pipeline only) |
+| `rag_source_chunks_returned`         | Histogram | —                        | Number of source chunks in the answer           |
 
 ### Grafana Dashboard (auto-provisioned)
 
 6 panels provisioned via `infra/grafana/provisioning/` — no clicks required:
 
-| Panel | PromQL pattern |
-| --- | --- |
-| Query Latency p50/p95/p99 | `histogram_quantile` on `rag_query_latency_seconds_bucket` |
-| Cache Hit Rate | `rate(cache_hits) / (rate(hits) + rate(misses))` |
-| QPS by tenant | `sum(rate(rag_queries_total[1m])) by (tenant_id)` |
-| Per-Stage Latency p95 | `histogram_quantile` on `rag_pipeline_stage_latency_seconds_bucket` |
-| Top Retrieval Score (avg) | `rate(score_sum) / rate(score_count)` |
-| Context Window Size p95 | `histogram_quantile` on `rag_query_tokens_bucket` |
+| Panel                     | PromQL pattern                                                          |
+| ------------------------- | ----------------------------------------------------------------------- |
+| Query Latency p50/p95/p99 | `histogram_quantile` on `rag_query_latency_seconds_bucket`          |
+| Cache Hit Rate            | `rate(cache_hits) / (rate(hits) + rate(misses))`                      |
+| QPS by tenant             | `sum(rate(rag_queries_total[1m])) by (tenant_id)`                     |
+| Per-Stage Latency p95     | `histogram_quantile` on `rag_pipeline_stage_latency_seconds_bucket` |
+| Top Retrieval Score (avg) | `rate(score_sum) / rate(score_count)`                                 |
+| Context Window Size p95   | `histogram_quantile` on `rag_query_tokens_bucket`                   |
 
 Prometheus: `http://localhost:9090` · Grafana: `http://localhost:3000` (admin/admin)
 
 > Prometheus + Grafana are omitted from the prod compose to fit t3.small (2 GB RAM). Re-enable on t3.medium+ by uncommenting the services in `docker-compose.prod.yml`.
+
+---
+
+## Load Testing
+
+Simulated production traffic for a documentation Q&A bot using [Locust](https://locust.io/) — 10 concurrent users, 60 seconds, 249 total queries.
+
+**Why high cache hit rate is realistic here:** Kapa.ai-style bots serve company documentation — the same 20–30 questions ("how do I authenticate?", "what's the rate limit?", "how do I install?") account for the majority of all queries. The test uses a fixed pool of 5 questions, simulating multiple users asking the same things concurrently. This is the primary use case the semantic cache is designed for.
+
+### Results
+
+| Metric                | Value                                |
+| --------------------- | ------------------------------------ |
+| Concurrent users      | 10                                   |
+| Total queries         | 249                                  |
+| **p50 latency** | **9ms** - semantic cache hit |
+| **p95 latency** | **500ms**                      |
+| p99 latency           | 7,000ms - cold LLM call (gpt-4o)     |
+| Throughput            | 4.16 RPS                             |
+| Error rate            | 0.80% ¹                             |
+
+> ¹ Both errors were API rate limits: OpenAI Tier 1 TPM limit (30K tokens/min for gpt-4o - increases to 450K on Tier 2 with $50+ lifetime spend) and Cohere free trial key (10 req/min). Error rate is 0% under normal single-user traffic.
+
+### Per-stage breakdown (Grafana, cold LLM calls only)
+
+| Stage                     | p95           | Notes                                                                     |
+| ------------------------- | ------------- | ------------------------------------------------------------------------- |
+| Retrieve (Qdrant)         | 77ms          | Hybrid dense+sparse vector search — unaffected by rate limits            |
+| Embed (OpenAI)            | ~150ms        | Query embedding before cache lookup                                       |
+| Rerank (Cohere)           | ~300ms        | On paid key - free trial adds retry backoff (~4.7s under concurrent load) |
+| Generate (gpt-4o)         | ~5s           | Cold LLM calls only - bypassed entirely on cache hits                     |
+| **Cached response** | **9ms** | Semantic similarity match in Redis HNSW index                             |
+
+The semantic cache reduces latency **~550x** for repeat queries (5s cold → 9ms cached). In production with a warm cache serving repeated documentation questions, p95 converges toward the 9ms cache hit latency as traffic accumulates.
+
+```bash
+./tests/load/run_load_test.sh          # 10 users, 60s — saves CSV + HTML to tests/load/results/
+./tests/load/run_load_test.sh --ui     # Locust web UI at localhost:8089
+```
 
 ---
 
@@ -408,12 +447,12 @@ python eval/ragas_gate.py --sample 20        # RAGAS quality gate
 
 ### 5. Open the apps
 
-| App | URL |
-| --- | --- |
-| Frontend | <http://localhost:3001> |
-| Grafana | <http://localhost:3000> (admin/admin) |
-| Prometheus | <http://localhost:9090> |
-| Query API docs | <http://localhost:8000/docs> |
+| App            | URL                                                       |
+| -------------- | --------------------------------------------------------- |
+| Frontend       | [http://localhost:3001](http://localhost:3001)               |
+| Grafana        | [http://localhost:3000](http://localhost:3000) (admin/admin) |
+| Prometheus     | [http://localhost:9090](http://localhost:9090)               |
+| Query API docs | [http://localhost:8000/docs](http://localhost:8000/docs)     |
 
 Sign up → ingest a URL → ask questions. After a few queries, Grafana panels will populate.
 
@@ -423,46 +462,47 @@ Sign up → ingest a URL → ask questions. After a few queries, Grafana panels 
 
 ### Auth Service (port 8004)
 
-| Method   | Endpoint          | Description                                    |
-| -------- | ----------------- | ---------------------------------------------- |
-| `POST`   | `/auth/signup`    | Create account → returns access token          |
-| `POST`   | `/auth/login`     | Login → returns access token                   |
-| `POST`   | `/auth/refresh`   | Rotate refresh token → new access token        |
-| `POST`   | `/auth/logout`    | Clear refresh cookie                           |
-| `POST`   | `/auth/guest`     | One-click guest access (no signup required)    |
+| Method   | Endpoint          | Description                                 |
+| -------- | ----------------- | ------------------------------------------- |
+| `POST` | `/auth/signup`  | Create account → returns access token      |
+| `POST` | `/auth/login`   | Login → returns access token               |
+| `POST` | `/auth/refresh` | Rotate refresh token → new access token    |
+| `POST` | `/auth/logout`  | Clear refresh cookie                        |
+| `POST` | `/auth/guest`   | One-click guest access (no signup required) |
 
 ### Ingestion Service (port 9001)
 
-| Method     | Endpoint             | Description                                          |
-| ---------- | -------------------- | ---------------------------------------------------- |
-| `POST`     | `/ingest`            | Submit URL for ingestion (async, returns `job_id`)   |
-| `POST`     | `/ingest/upload`     | Upload a file for ingestion                          |
-| `GET`      | `/ingest/{job_id}`   | Poll job status                                      |
-| `GET`      | `/sources`           | List all ingested sources                            |
-| `DELETE`   | `/ingest/upload`     | Delete a source                                      |
+| Method     | Endpoint             | Description                                                          |
+| ---------- | -------------------- | -------------------------------------------------------------------- |
+| `POST`   | `/ingest`          | Submit URL for ingestion (async, returns `job_id`)                 |
+| `POST`   | `/ingest/presign`  | Get presigned S3 PUT URL — browser uploads file directly to S3      |
+| `POST`   | `/ingest/confirm`  | Confirm upload complete — starts ingestion job (returns `job_id`) |
+| `GET`    | `/ingest/{job_id}` | Poll job status                                                      |
+| `GET`    | `/sources`         | List all ingested sources for this tenant                            |
+| `DELETE` | `/sources/{id}`    | Delete a source (removes from Qdrant + S3)                           |
 
 ### Query Service (port 9000)
 
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| `POST` | `/query` | Ask a question — `stream: true` for SSE, `false` for JSON |
-| `GET` | `/query/conversations` | List all conversations for this tenant |
-| `GET` | `/query/conversations/{id}/messages` | Load full message history |
-| `DELETE` | `/query/conversation/{id}` | Clear conversation history |
-| `GET` | `/health` | Health check |
-| `GET` | `/metrics` | Prometheus metrics endpoint |
+| Method     | Endpoint                               | Description                                                   |
+| ---------- | -------------------------------------- | ------------------------------------------------------------- |
+| `POST`   | `/query`                             | Ask a question —`stream: true` for SSE, `false` for JSON |
+| `GET`    | `/query/conversations`               | List all conversations for this tenant                        |
+| `GET`    | `/query/conversations/{id}/messages` | Load full message history                                     |
+| `DELETE` | `/query/conversation/{id}`           | Clear conversation history                                    |
+| `GET`    | `/health`                            | Health check                                                  |
+| `GET`    | `/metrics`                           | Prometheus metrics endpoint                                   |
 
 ---
 
 ## Observability
 
-| Signal | Implementation |
-| --- | --- |
-| Query traces | LangSmith — set `LANGSMITH_API_KEY` to enable |
-| Prometheus metrics | `/metrics` on query-service — 8 metrics covering latency, cache, stages, retrieval quality |
-| Grafana dashboard | Auto-provisioned 6-panel dashboard at <http://localhost:3000> |
-| Ingestion job state | PostgreSQL `ingestion_jobs` table |
-| Circuit breaker | Built into `OpenAILLM` and `OpenAIEmbedding` |
+| Signal              | Implementation                                                                                |
+| ------------------- | --------------------------------------------------------------------------------------------- |
+| Query traces        | LangSmith — set `LANGSMITH_API_KEY` to enable                                              |
+| Prometheus metrics  | `/metrics` on query-service — 8 metrics covering latency, cache, stages, retrieval quality |
+| Grafana dashboard   | Auto-provisioned 6-panel dashboard at[http://localhost:3000](http://localhost:3000)              |
+| Ingestion job state | PostgreSQL `ingestion_jobs` table                                                           |
+| Circuit breaker     | Built into `OpenAILLM` and `OpenAIEmbedding`                                              |
 
 ---
 
@@ -470,29 +510,17 @@ Sign up → ingest a URL → ask questions. After a few queries, Grafana panels 
 
 The retrieval stack was chosen empirically, not by convention.
 
-| Notebook | What | Result |
-| --- | --- | --- |
-| `01_eval_set_generation` | GPT-4o generates 78 Q&A pairs from real docs | Frozen eval set created |
-| `02_docs_chunking_retrieval` | 12 combinations: 4 chunkers × 3 retrievers | HAC + Dense wins on MRR |
-| `03_reranker_comparison` | Dense/Hybrid × with/without Cohere | Reranker: +0.040 MRR |
-| `04_ragas_baseline` | Full pipeline RAGAS evaluation | All 4 gates passed |
+| Notebook                       | What                                         | Result                  |
+| ------------------------------ | -------------------------------------------- | ----------------------- |
+| `01_eval_set_generation`     | GPT-4o generates 78 Q&A pairs from real docs | Frozen eval set created |
+| `02_docs_chunking_retrieval` | 12 combinations: 4 chunkers × 3 retrievers  | HAC + Dense wins on MRR |
+| `03_reranker_comparison`     | Dense/Hybrid × with/without Cohere          | Reranker: +0.040 MRR    |
+| `04_ragas_baseline`          | Full pipeline RAGAS evaluation               | All 4 gates passed      |
 
 The eval set (`eval/golden_dataset/docs/eval_v1.jsonl`) is **frozen**. Ground truth is tied to 40-character text anchors — it survives chunking changes.
 
 ---
 
-## Roadmap
-
-- [x] **Phase 1** — Ingestion pipeline (embed + upsert + job tracking)
-- [x] **Phase 2** — Query pipeline (stream + semantic cache + conversation + RAGAS baseline)
-- [x] **Phase 3** — MCP server, GitHub/PDF connectors, RAGAS CI gate
-- [x] **Phase 4** — JWT auth + RBAC, Next.js frontend, chat history, EC2 + CI/CD deploy
-- [x] **Phase 5** — Semantic cache (Redis Stack HNSW), LLMOps metrics (Prometheus + Grafana), tenant-aware system prompt, guest login, admin dashboard
-- [ ] **Phase 6** — Locust load tests, p95 latency in README, per-tenant token cost tracking
-- [ ] **Phase 7** — User-supplied GitHub tokens for private repo ingestion
-- [ ] **Phase 8** — AWS upgrade: ECS Fargate, RDS, ElastiCache, ALB, blue/green deploy
-
----
 
 ## System Design
 
@@ -514,4 +542,4 @@ MIT — see [LICENSE](LICENSE).
 
 Built by **Ayan Arshad** · [GitHub](https://github.com/AyanArshad02)
 
-> This project reverse-engineers the architecture behind tools like [kapa.ai](https://kapa.ai), not as a competitor, but as a rigorous exercise in building production RAG systems that are actually evaluated, not just vibes-checked.
+> This project reverse engineers the architecture behind tools like [kapa.ai](https://kapa.ai), not as a competitor, but as a rigorous exercise in building production RAG systems that are actually evaluated, not just vibes checked
