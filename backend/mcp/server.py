@@ -37,17 +37,28 @@ mcp = FastMCP(
 )
 
 
+_DEFAULT_API_KEY = os.getenv("KAPA_API_KEY", "")
+_DEFAULT_TENANT_ID = os.getenv("KAPA_TENANT_ID", "")
+
+
 @mcp.tool()
-async def search_knowledge_base(query: str, tenant_id: str, api_key: str) -> str:
+async def search_knowledge_base(
+    query: str,
+    api_key: str = _DEFAULT_API_KEY,
+    tenant_id: str = _DEFAULT_TENANT_ID,
+) -> str:
     """
-    Search the knowledge base for a tenant and return a grounded answer with source URLs.
+    Search the knowledge base and return a grounded answer with source URLs.
 
     Args:
         query:     The question to answer.
-        tenant_id: The tenant whose knowledge base to search.
-        api_key:   The tenant's API key (used for authentication).
+        api_key:   JWT access token (defaults to KAPA_API_KEY env var).
+        tenant_id: Tenant ID (defaults to KAPA_TENANT_ID env var).
     """
-    return await search_knowledge_base_http(QUERY_SERVICE_URL, query, api_key)
+    resolved_key = api_key or _DEFAULT_API_KEY
+    if not resolved_key:
+        return "No API key provided. Set KAPA_API_KEY env var or pass api_key explicitly."
+    return await search_knowledge_base_http(QUERY_SERVICE_URL, query, resolved_key)
 
 
 @mcp.tool()

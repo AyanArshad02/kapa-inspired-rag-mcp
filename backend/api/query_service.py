@@ -3,13 +3,12 @@ from __future__ import annotations
 import json
 import logging
 import os as _os
-from uuid import UUID, uuid4
-
 from decimal import Decimal
+from uuid import UUID, uuid4
 
 import asyncpg
 import redis.asyncio as aioredis
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
