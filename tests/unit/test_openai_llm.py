@@ -100,6 +100,8 @@ class TestOpenAILLM:
         mock_choice.message.content = "Dependency injection lets you declare shared logic."
         mock_response = MagicMock()
         mock_response.choices = [mock_choice]
+        mock_response.usage.prompt_tokens = 80
+        mock_response.usage.completion_tokens = 30
         mock_openai.chat.completions.create = AsyncMock(return_value=mock_response)
 
         llm = OpenAILLM()
