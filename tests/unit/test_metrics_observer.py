@@ -147,7 +147,9 @@ class TestMetricsObserver:
 
         ctx = _make_context(
             tenant=tenant,
-            pipeline_stage_latencies={"embed": 0.1, "retrieve": 0.3, "rerank": 0.05, "generate": 0.8},
+            pipeline_stage_latencies={
+                "embed": 0.1, "retrieve": 0.3, "rerank": 0.05, "generate": 0.8
+            },
         )
         result = _make_result(cached=False)
         await observer.notify(ctx, result)

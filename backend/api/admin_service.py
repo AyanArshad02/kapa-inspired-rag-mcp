@@ -32,10 +32,10 @@ async def overview(request: Request) -> dict:
                 (SELECT COUNT(*)  FROM users)                                      AS total_users,
                 (SELECT COUNT(*)  FROM source_hashes)                             AS total_sources,
                 (SELECT COUNT(*)  FROM conversation_turns WHERE role = 'user')    AS total_queries,
-                (SELECT COALESCE(SUM(tokens_in),  0) FROM usage_records
-                    WHERE created_at > NOW() - INTERVAL '30 days')                AS total_tokens_in,
+                (SELECT COALESCE(SUM(tokens_in), 0) FROM usage_records
+                    WHERE created_at > NOW() - INTERVAL '30 days') AS total_tokens_in,
                 (SELECT COALESCE(SUM(tokens_out), 0) FROM usage_records
-                    WHERE created_at > NOW() - INTERVAL '30 days')                AS total_tokens_out
+                    WHERE created_at > NOW() - INTERVAL '30 days') AS total_tokens_out
             """
         )
 
