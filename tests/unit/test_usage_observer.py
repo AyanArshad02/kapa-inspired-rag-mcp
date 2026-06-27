@@ -6,11 +6,13 @@ from uuid import uuid4
 
 import pytest
 
-from backend.models import Chunk, ContextWindow, QueryResult, SourceType
+from backend.models import ContextWindow, QueryResult
 from backend.observers.usage_observer import UsageObserver
 
 
-def _make_context(tenant_id: str | None = None, tokens_in: int = 0, tokens_out: int = 0) -> ContextWindow:
+def _make_context(
+    tenant_id: str | None = None, tokens_in: int = 0, tokens_out: int = 0
+) -> ContextWindow:
     ctx = ContextWindow(
         query="What is DI?",
         chunks=[],
@@ -65,6 +67,6 @@ class TestUsageObserver:
         result = _make_result()
         await observer.notify(ctx, result)
         call_args = mock_conn.execute.call_args
-        # positional args after the SQL string are: tenant_id, conversation_id, tokens_in, tokens_out, cost_usd
+        # positional args after SQL: tenant_id, conversation_id, tokens_in, tokens_out, cost_usd
         assert 300 in call_args.args
         assert 80 in call_args.args
