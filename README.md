@@ -70,6 +70,8 @@ See full experiment analysis in [experiments/](experiments/) and decision ration
 
 ## Architecture
 
+![High-Level Architecture](system-design/hld-architecture.png)
+
 ```text
 ┌──────────────────────────────────────────────────────────────────────┐
 │                              Clients                                  │
@@ -267,6 +269,8 @@ Simulated production traffic for a documentation Q&A bot using [Locust](https://
 **Why high cache hit rate is realistic here:** Kapa.ai-style bots serve company documentation — the same 20–30 questions ("how do I authenticate?", "what's the rate limit?", "how do I install?") account for the majority of all queries. The test uses a fixed pool of 5 questions, simulating multiple users asking the same things concurrently. This is the primary use case the semantic cache is designed for.
 
 ### Results
+
+![Locust Load Test Results](system-design/1781967643416.jpeg)
 
 | Metric                | Value                                |
 | --------------------- | ------------------------------------ |

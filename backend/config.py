@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     environment: str = "dev"
     cloudwatch_log_group: str = "/kapa-rag/production"
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 
 settings = Settings()
