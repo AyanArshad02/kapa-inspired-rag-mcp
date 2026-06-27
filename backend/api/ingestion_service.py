@@ -6,7 +6,7 @@ from pathlib import Path
 from uuid import UUID
 
 import asyncpg
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel, HttpUrl
@@ -109,28 +109,42 @@ async def submit_ingestion_job(
     return IngestResponse(job_id=job.id, status=job.status)
 
 
-@app.post("/ingest/upload", response_model=IngestResponse, status_code=202)
-async def upload_and_ingest(
-    file: UploadFile = File(...),
-    tenant_id: str = Depends(get_tenant_id),
-) -> IngestResponse:
-    """Accept a .pdf or .md upload, store it in S3, then queue ingestion.
+class PresignRequest(BaseModel):
+    filename: str
+    content_type: str
 
-    Both file types are routed to PDFConnector:
-      .pdf  → pymupdf4llm extraction → RecursiveChunker
-      .md   → raw Markdown           → HeadingAwareChunker
-    """
-    filename = file.filename or ""
-    suffix = Path(filename).suffix.lower()
+
+class PresignResponse(BaseModel):
+    presigned_url: str
+    s3_url: str
+
+
+class ConfirmRequest(BaseModel):
+    s3_url: str
+
+
+@app.post("/ingest/presign", response_model=PresignResponse)
+async def presign_upload(
+    body: PresignRequest,
+    tenant_id: str = Depends(get_tenant_id),
+) -> PresignResponse:
+    """Return a presigned S3 PUT URL so the browser can upload directly."""
+    suffix = Path(body.filename).suffix.lower()
     if suffix not in {".pdf", ".md"}:
         raise HTTPException(status_code=422, detail="Only .pdf and .md files are supported")
+    presigned_url, s3_url = _storage.presign_upload(tenant_id, body.filename)
+    return PresignResponse(presigned_url=presigned_url, s3_url=s3_url)
 
-    content = await file.read()
-    s3_url = await _storage.upload(content, tenant_id, filename)
 
+@app.post("/ingest/confirm", response_model=IngestResponse, status_code=202)
+async def confirm_upload(
+    body: ConfirmRequest,
+    tenant_id: str = Depends(get_tenant_id),
+) -> IngestResponse:
+    """Called after the browser has PUT the file to S3. Creates the ingestion job."""
     job = IngestionJob(
         tenant_id=tenant_id,
-        source_url=s3_url,
+        source_url=body.s3_url,
         source_type=SourceType.PDF,  # PDFConnector handles both .pdf and .md
     )
     repo: PostgresIngestionJobRepository = app.state.job_repo
@@ -171,7 +185,8 @@ async def delete_uploaded_file(
         vector_db=QdrantDB(),
     )
     await fm.purge_source(tenant_id, source_url)
-    await _storage.delete(source_url)
+    if source_url.startswith("s3://"):
+        await _storage.delete(source_url)
     return {"status": "deleted", "source_url": source_url}
 
 

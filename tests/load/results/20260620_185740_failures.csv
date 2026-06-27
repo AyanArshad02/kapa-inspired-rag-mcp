@@ -1,0 +1,2 @@
+Method,Name,Error,Occurrences,First Seen,Last Seen
+POST,/query,CatchResponseError('Unexpected 500: Internal Server Error'),2,2026-06-20T13:27:58Z,2026-06-20T13:28:08Z

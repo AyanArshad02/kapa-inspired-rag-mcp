@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal
 from enum import StrEnum
 from typing import Any
 from uuid import UUID, uuid4
@@ -40,6 +41,7 @@ class Chunk:
     metadata: dict[str, Any] = field(default_factory=dict)
     content_hash: str = ""
     created_at: datetime = field(default_factory=datetime.utcnow)
+    rerank_score: float | None = None
 
 
 @dataclass
@@ -87,6 +89,12 @@ class ContextWindow:
     tenant_id: str = ""
     tenant_sources: list[dict] = field(default_factory=list)
     query_embedding: list[float] = field(default_factory=list)
+    top_retrieval_score: float = 0.0
+    pipeline_stage_latencies: dict[str, float] = field(default_factory=dict)
+    pipeline_started_at: float = 0.0
+    tokens_in: int = 0
+    tokens_out: int = 0
+    cost_usd: Decimal = field(default_factory=lambda: Decimal("0"))
 
 
 @dataclass
